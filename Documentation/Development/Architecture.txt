@@ -7,3 +7,36 @@ At the very least, TclJACK will provide a C library wrapper around libjack that 
 
 I also envisage providing a relational data model for managing the core JACK state data within Tcl itself.  This may make use of the TclRAL relational data management package for Tcl.  This model would need to be synchronised with the JACK server process somehow.  Perhaps this could be done by running jack_evmon via expect's spawn command, and using notifications from there to trigger updates to the data model when required.
 
+I'm not sure if the library should connect to the JACK server when it is loaded (in Tcljack_Init), or in response to a command.  I presume there's a corresponding _Destroy or something procedure you can define too, in which we could disconnect (ah, you can define this however you like and pass it to the interpreter when initing).  And, indeed, should it support connecting to multiple servers somehow?  For the moment we could just connect to the default server.
+
+Given that connecting/disconnecting from the JACK server can interrupt audio processing, don't do it any more often than necessary.  This probably means having separate commands for connecting and disconnecting.
+
+
+
+Essential functionality to implement (think of this as a TODO list):
+
+[ ] JACK server sampling rate reporting
+[ ] CPU DSP load
+[ ] Buffering parameters (frames/period, periods/buffer)
+[ ] JACK transport control interface (start, stop, query, seek)
+
+
+
+References:
+
+
+http://jackaudio.org/files/docs/html/group__TransportControl.html
+
+jack_transport_query
+jack_transport_locate
+jack_transport_reposition
+jack_transport_start
+jack_transport_stop
+
+
+http://jackaudio.org/files/docs/html/group__ServerControl.html
+
+jack_cpu_load
+jack_get_buffer_size
+jack_get_sample_rate
+

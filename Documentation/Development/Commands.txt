@@ -1,0 +1,13 @@
+What commands do I want for this thing, and what arguments should they support?
+
+# Connecting to JACK server.
+# Should we support multiple connections?  What would Fons do...? ;^)
+# "connect" or "register"?  I think "register" is more correct; "connect" could be required for establishing port connections!
+jack register [ -server <servername> ]
+jack deregister [ -server <servername> ]
+
+jack query ... OR jack info ...
+
+jack connect <source-port> <sink-port>
+jack disconnect <source-port> <sink-port>
+
