@@ -1,0 +1,9 @@
+Basic system design notes for TclJACK
+
+
+The aim is to provide an easy way for Tcl applications to access and change the state of a JACK server instance.  Ultimately, to be able to perform the functions of jack_lsp, jack_connect, jack_disconnect, jack_transport, jack_alias, and so on would be good.  This would provide a layer for easy implementation of something resembling qjackctl using Tcl and Tk to do the high-level integration, functionality, and user interface.  Something that can become part of my DeskNerd tray utility suite is probably my personal ultimate goal.
+
+At the very least, TclJACK will provide a C library wrapper around libjack that can be loaded into a Tcl interpreter.  A one-to-one mapping of functions such as jack_get_ports may be appropriate.  Using Tcl will have the advantage that lists are readily and cleanly supported (e.g. as return types or arguments).  Extra functions beyond the core libjack functions will probably also be added for convenience.
+
+I also envisage providing a relational data model for managing the core JACK state data within Tcl itself.  This may make use of the TclRAL relational data management package for Tcl.  This model would need to be synchronised with the JACK server process somehow.  Perhaps this could be done by running jack_evmon via expect's spawn command, and using notifications from there to trigger updates to the data model when required.
+

@@ -1,4 +1,4 @@
-Basic relational data model for JACK state data, for possible relational data access layer for TclJACK.
+Basic relational data model for JACK state data, for possible relational data access layer for TclJACK (using TclRAL?).
 
 
 Server {Server_Name, Host?, PID?, Fs, p, n}
@@ -9,3 +9,16 @@ Connection {Server_Name, Source_Client_Name, Source_Port_Name, Sink_Client_Name,
 Port_Property_Type {Port_Property}
 Port_Property {Server_Name, Client_Name, Port_Name, Port_Property}
 
+
+Port property types:
+	input		JackPortIsInput
+	output		JackPortIsOutput
+	can-monitor	JackPortCanMonitor
+	physical	JackPortIsPhysical
+	terminal	JackPortIsTerminal
+
+Complications/Subtleties:
+	- There can be multiple servers, but each client (and everything hanging off Client) must belong to exactly one server.  Must every server on a system have a unique name?  And what about netjack?  Do we need to store the host address of the server as well, since the same server name could be in use by different servers on different nodes?
+	- State updates: use jack_evmon via expect from Tcl layer to watch for changes and update when necessary?  Or perhaps bring evmon functionality into TclJACK itself (or the Tcl layer).
+	- Transactions and locking: presumably irrelevant, as everything probably happens "instantaneously" and we see changes immediately.
+	
