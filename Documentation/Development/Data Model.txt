@@ -1,6 +1,8 @@
 Basic relational data model for JACK state data, for possible relational data access layer for TclJACK (using TclRAL?).
 
 
+Relations and attributes:
+
 Server {Server_Name, Host?, PID?, Fs, p, n}
 Client {Server_Name, Client_Name, PID?}
 Port {Server_Name, Client_Name, Port_Name, Port_Latency, Total_Latency}
@@ -9,6 +11,17 @@ Connection {Server_Name, Source_Client_Name, Source_Port_Name, Sink_Client_Name,
 Port_Property_Type {Port_Property}
 Port_Property {Server_Name, Client_Name, Port_Name, Port_Property}
 
+Domains:
+	server name
+	host name/IP address
+	process ID
+	sampling rate
+	period size
+	nperiods
+	client name
+	port name
+	port latency
+	port property
 
 Port property types:
 	input		JackPortIsInput
