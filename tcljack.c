@@ -25,6 +25,7 @@ static int
 Tcljack_Hello(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
 {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("TclJACK says 'hello'.", -1));
+//	Tcl_SetObjResult(interp, Tcl_NewStringObj(TCL_VERSION, -1));
 	return TCL_OK;
 }
 
@@ -70,7 +71,7 @@ Tcljack_Deregister(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 
 
 
-// Simple test using libjack to retrieve the server's current sampling frequency:
+// Retrieve the server's current sampling frequency:
 static int
 Tcljack_Samplerate(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
@@ -91,6 +92,28 @@ Tcljack_Samplerate(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 	return TCL_OK;
 }
 
+// Retrieve the server's current sampling frequency:
+// TODO: switch to Tcl object interface?
+static int
+Tcljack_Cpuload(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
+{
+	float cpu_load = 0.0;
+	char output_buffer[6];	// How big depends on the format in sprintf below, I guess.
+
+	// Don't try to do anything if we're not connected (AFAWCT) (to avoid crash):
+	if (!connected) {
+		interp->result = "Not connected to JACK server!";
+		return TCL_ERROR; 
+	}
+
+	// Find and return sampling rate:
+	cpu_load = jack_cpu_load(client);	// NOTE: this has already been multiplied by 100%!
+	sprintf(output_buffer, "%0.2f", cpu_load);	// Pad with spaces to the left?  1 DP?  Is the returned value in % or not?
+	Tcl_SetResult(interp, output_buffer, TCL_VOLATILE);
+
+	return TCL_OK;
+}
+
 
 
  /*
@@ -99,7 +122,8 @@ Tcljack_Samplerate(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 int DLLEXPORT
 Tcljack_Init(Tcl_Interp *interp)
 {
-	if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL)
+//	if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL)
+	if (Tcl_InitStubs(interp, "8.4", 0) == NULL)	// Just to make it work with expect, which is currently 8.4 on my system, even though it's otherwise Tcl 8.5.
 	{
 		return TCL_ERROR;
 	}
@@ -115,6 +139,8 @@ Tcljack_Init(Tcl_Interp *interp)
 	Tcl_CreateCommand(interp, "jack_register", Tcljack_Register, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 	Tcl_CreateCommand(interp, "jack_deregister", Tcljack_Deregister, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 	Tcl_CreateCommand(interp, "jack_samplerate", Tcljack_Samplerate, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	Tcl_CreateCommand(interp, "jack_cpuload", Tcljack_Cpuload, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+
 	// How do we implement subcommands, like [jack register] or [jack info]?  Do we just define a main "jack" command and have it figure out whatever subcommand might be being called from the arguments?
 	 
 	return TCL_OK;
