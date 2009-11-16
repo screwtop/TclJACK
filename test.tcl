@@ -12,6 +12,7 @@ puts [jack_counter]
 if {[catch {puts [jack_samplerate]} result]} {puts stderr $result}
 jack_register
 puts [jack_samplerate]
+puts [jack_cpuload]
 if {[catch {puts [jack_register]} result]} {puts stderr $result}
 jack_deregister
 if {[catch {puts [jack_samplerate]} result]} {puts stderr $result}
