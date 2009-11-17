@@ -169,6 +169,26 @@ Tcljack_Cpuload(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *arg
 }
 
 
+// CTTOI, we probably want a single command for level metering, to ensure that we use the same measurement window for all measurements.  Returning a tuple, essentially (as a Tcl list, I guess).
+// TODO: handle args for different measurements.  Currently just does peak (testing).  Should support peak, trough, RMS.  Could perhaps optionally do conversion to dB (either numeric or AES-17 dB FS), Stevens RMS loudness, etc. as well.
+static int
+Tcljack_Meter(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
+{
+	char output_buffer[10];	// How big depends on the format in sprintf below, I guess.
+
+	// Don't try to do anything if we're not registered (AFAWCT) (to avoid crash):
+	if (!registered) {
+		interp->result = "Not connected to JACK server!";
+		return TCL_ERROR; 
+	}
+
+	sprintf(output_buffer, "%1.8f", buffer_rms);
+	Tcl_SetResult(interp, output_buffer, TCL_VOLATILE);
+
+	return TCL_OK;
+}
+
+
 // Return the last recorded per-buffer peak sample value (as a raw numeric float, not dB or anything).
 // This will be read asynchronously, but as meters are only going to be refreshing up to say 60 Hz, that's probably fine.  1 / 60 Hz = ~17 ms.  At p=64 Fs=96 kHz, each period would last 666 microseconds.
 // How many digits of precision do we need?  With DSP being applied, who knows, but for plain 24-bit audio: 1 / 2 ^ 24 = ~6e-08, so 8 decimal places is probably reasonable.  JACK floating-point data should not normally exceed 1, so 1 digit before the decimal should be fine.
@@ -196,22 +216,32 @@ int
 process_jack_buffer(jack_nframes_t nframes, void *arg)
 {
 	jack_default_audio_sample_t *in;
-//	jack_default_audio_sample_t
-	unsigned int i;
-	jack_default_audio_sample_t peak = 0.0;
-//	jack_default_audio_sample_t trough = 0.0;
-//	jack_default_audio_sample_t rms_sum_of_squares = 0.0;
+//	jack_default_audio_sample_t *in_right;
+	unsigned int i;		// For for-loop index.
+	jack_default_audio_sample_t max_sample = 0.0;		// For peak (largest encountered) value
+	jack_default_audio_sample_t min_sample = 0.0;	// For trough (smallest non-zero) value
+	jack_default_audio_sample_t rms_sum_of_squares = 0.0;	// For RMS level
+	jack_default_audio_sample_t offset_average = 0.0;	// for DC offset measurement
 	
 	in = jack_port_get_buffer (input_port, nframes);
 	for (i = 0; i < nframes; i++)
 	{
-		const float s = fabs(in[i]);
-		if (s > peak) { peak = s; }
+		const float current_sample = fabs(in[i]);
+
+		// For peak:
+		if (current_sample > max_sample) { max_sample = current_sample; }
+
+		// For trough:
+		if (current_sample < min_sample) { min_sample = current_sample; }
+
+		// For RMS:
+		rms_sum_of_squares += pow(current_sample,2.0);
 	}
 
 	// Copy ultimate peak value to global variable:
 	// Or maybe just use buffer_peak in the loop above, why not?
-	buffer_peak = peak;
+	buffer_peak = max_sample;
+	buffer_rms = sqrt(rms_sum_of_squares / nframes);
 
 	return 0;
 }
@@ -244,6 +274,7 @@ Tcljack_Init(Tcl_Interp *interp)
 	Tcl_CreateCommand(interp, "jack_cpuload", Tcljack_Cpuload, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 
 	Tcl_CreateCommand(interp, "jack_peak", Tcljack_Peak, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	Tcl_CreateCommand(interp, "jack_meter", Tcljack_Meter, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 
 	// How do we implement subcommands, like [jack register] or [jack info]?  Do we just define a main "jack" command and have it figure out whatever subcommand might be being called from the arguments?
 	 
