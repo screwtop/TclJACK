@@ -1,4 +1,4 @@
-What commands do I want for this thing, and what arguments should they support?
+What commands do I want for this thing, and what arguments should they support?  I.e. user interface design. ;^)
 
 # Connecting to JACK server.
 # Should we support multiple connections?  What would Fons do...? ;^)
@@ -6,8 +6,27 @@ What commands do I want for this thing, and what arguments should they support?
 jack register [ -server <servername> ]
 jack deregister [ -server <servername> ]
 
+# Obtaining information from the JACK server:
 jack query ... OR jack info ...
+	samplerate
+	load (i.e. CPU DSP load)
+	period_size
+	num_periods
+	capture_ports	OR source_ports OR in_ports
+	playback_ports	OR sink_ports OR out_ports
+	client name (may be auto-modified by server for uniqueness)
 
-jack connect <source-port> <sink-port>
+# Managing port-to-port connections:
+jack connect <source-port> <sink-port>	OR jack port_connect ...
 jack disconnect <source-port> <sink-port>
+
+# Some functions for sound signal level monitoring:
+jack level OR jack monitor OR jack meter
+	-peak
+	-trough
+	-rms OR -RMS OR -average
+	-db OR -dB or -decibels
+	histogram
+	possible DC offset
+
 

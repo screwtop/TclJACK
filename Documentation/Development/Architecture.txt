@@ -19,8 +19,8 @@ Essential functionality to implement (think of this as a TODO list):
 [ ] CPU DSP load
 [ ] Buffering parameters (frames/period, periods/buffer)
 [ ] JACK transport control interface (start, stop, query, seek)
-
-
+[ ] Perhaps an input port (or two, or n) for monitoring a signal (e.g. a master output meter)
+[ ] Indeed, may need a JACK process() handler for metering.  Could write numeric peak, RMS, and trough values to static variables in the C extension, with Tcl commands provided for reading them and converting into dB, Stevens loudness, etc.  Control over the metering window size would be a useful refinement (but could initially just process each JACK buffer).
 
 References:
 
