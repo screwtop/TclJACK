@@ -1,0 +1,89 @@
+Stevens: k x I ^ a
+For loudness, a = 0.67
+k = 1.6 for hot masters, 2.5 for Replay Gained material, IIRC.
+
+proc every {ms body} {eval $body; after $ms [info level 0]}
+
+set nmax 1000
+every 33 {puts [jack_peak]; if {[incr ::nmax -1]<=0} return}
+
+# Compute Stevens loudness:
+expr {1.6 * pow([jack_peak],0.67)}
+# ~2 us/iteration on Intel(R) Core(TM)2 Quad CPU    Q6600  @ 2.40GHz
+# If we assume full-scale sine is louded reasonable signal, what scaling factor to use?:
+% expr {1 / (pow(1 / sqrt(2), 0.67))}
+1.26137740883
+% expr {1.26 * (pow([jack_meter], 0.67))}
+# You'll get the odd over using this, however!  But you should only use peak metering for over detection, so no biggie.
+
+
+
+set nmax 1000
+every 33 {puts [expr {2.5 * pow([jack_meter],0.67)}]; if {[incr ::nmax -1]<=0} return}
+
+set nmax 1000
+every 33 {sound_gauge_update [jack_peak]}; if {[incr ::nmax -1]<=0} return}
+
+
+# Hmm, what's the raw RMS value of jnoise's pink noise source?  We could probably use that to calibrate our Stevens loudness meter's "0" point.  If it's -20 dB FS (AES RMS), that's -23 dB (RMS) numeric
+# Timing: 44100 / 2048 = ~21.5 frames/s which is ~46 ms/frame, so we should probably only sample every 50 ms with these settings.
+# Other extreme: 96000 / 64 -> 0.67 ms/frame!
+
+load ./libtcljack.so
+jack_register
+
+proc every {ms body} {eval $body; after $ms [info level 0]}
+
+set nmax 1000
+set count 0
+set running_sum 0.0
+every 50 {
+	global running_sum count
+	incr count
+	set running_sum [expr {$running_sum + [jack_meter]}]
+	puts [expr {$running_sum / $count}]
+	if {[incr ::nmax -1]<=0} return
+}
+
+# OK, looks like it's converging to 0.0696-ish.
+
+10 ** (-23 / 20.0) = 0.070794578438413802
+but is it exactly -23 dB?
+
+20 * math.log10(1 / math.sqrt(2) / 10)
+-23.010299956639813
+Coincidence?
+
+Ah, the 3 dB is actually ~3 dB because of the crest factor of a sine wave, and the 20 is I think arbitrary.  So it's exactly:
+
+10 * math.log10(2) + 20
+23.010299956639813
+
+So, the exact numeric RMS value of a ~-23 dB FS signal would be:
+10 ** (-(10 * math.log10(2) + 20) / 20.0)
+0.070710678118654752
+Which is, as I suspected
+0.1 / math.sqrt(2)
+
+OK.  Good.
+
+BTW, RMS level of Replay Gained music seems to be around 0.1 to 0.126.  0.1 is of course exactly -20 dB.  0.126 is close to -18 dB.
+
+So, when that get converted to Stevens loudness:
+
+If we want -20 dB (numeric RMS)  to be 0.5 on the scale
+0.5 / ((0.1 / math.sqrt(2)) ** 0.67)
+2.949952702680823
+
+For 0.126, the louder end of the Replay Gained scale:
+0.5 / ((0.125) ** (2.0/3.0))
+2.0
+
+So a number between 2 and 3, I guess. :)  I had 2.5 before. :)
+
+For a full-scale sine wave (nominal loudes non-weird signal):
+0.5 / ((1 / math.sqrt(2)) ** (2.0/3.0))
+0.6299605249474366
+
+Hmm, that's shrinking it.
+
