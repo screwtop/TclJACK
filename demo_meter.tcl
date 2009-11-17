@@ -1,3 +1,4 @@
+#!/usr/bin/wish
 # Basic test using TclJACK to produce a Stevens loudness meter (single channel).
 
 load ./libtcljack.so
@@ -6,6 +7,7 @@ puts "JACK sampling rate = [jack_samplerate] Hz"
 
 set indicator_width 16
 set indicator_height 600
+
 
 # Container frame:
 pack [frame .sound_gauge  -width $indicator_width  -height $indicator_height  -relief sunken  -borderwidth 1 -background black] -side left
