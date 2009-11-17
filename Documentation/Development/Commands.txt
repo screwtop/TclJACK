@@ -29,4 +29,5 @@ jack level OR jack monitor OR jack meter
 	histogram
 	possible DC offset
 
+# Hmm, if separate command invocations are required for peak, trough and RMS levels, it might be problematic if the calling program is expected them to be for the same time window.  So, probably a single [jack meter] or [jack level] command that can report any (or all) measurements at once would be the way to go.
 
