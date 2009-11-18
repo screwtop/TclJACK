@@ -1,3 +1,4 @@
+#!wish
 #!/usr/bin/wish
 # Basic test using TclJACK to produce a Stevens loudness meter (single channel).
 
