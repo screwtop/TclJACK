@@ -9,7 +9,23 @@
 // General overview:
 // % load ./libtcljack.so
 // jack_register -> Tcljack_Register()
-//
+// [port connection handling is outside this program's control; you can do it with the jack_connect command or qjackctl.  However, this interface should provide a wrapper for the JACK connect function (whatever it's called).]
+// JACK server calls this component's process_jack_buffer() function when supplying audio.
+// jack_deregister -> Tcljack_Deregister()
+
+
+/* TODO:
+ * Figure out how to handle disconnections from JACK properly.
+ * Figure out how to implement subcommands.
+ * Learn about argument handling, and implement for [jack meter -peak -rms -trough -db].
+ * Investigate event handling: how does a Tcl extension declare and generate an event?  Or handle a Tcl event?  Or are these only relevant in Tk, which has an event loop?
+ * Implement wrappers for the following:
+ * jack_set_sample_rate_callback (to avoid needlessly querying for this; could simply update static variable in this, and/or (perhaps better) trigger a Tcl event)
+ * jack_set_buffer_size_callback (similar to above)
+ * jack_set_xrun_callback (for xrun reporting; ideally would trigger Tcl event to continue with push/event data flow style)
+ * jack_on_shutdown (correct way to handle disconnection)
+ */
+
 
 // Note the naming: Tcljack_Xxx, not TclJACK_Xxx, which didn't seem to work ("couldn't find procedure Tcljack_init").
 
@@ -38,6 +54,21 @@ static float buffer_trough = 0.0;
 static float buffer_rms = 0.0;
 // Perhaps also a convenience boolean to indicate presence of a signal on the input port (or, TODO, ports).
 static bool signal_present = false;
+
+// Program info and usage:
+static const unsigned int tcljack_version_major = 0;
+static const unsigned int tcljack_version_minor = 1;
+
+// + version, usage, 
+static char usage_string[] = "Usage forms:\n"
+	"	jack register\n"
+	"	jack deregister\n"
+	"	jack samplerate\n"
+	"	jack cpuload\n"
+	"	jack meter\n"
+//	"	jack info ()\n"
+//	"	jack meter -peak -rms -trough\n"
+;
 
 
 // Forward/stub/whatever declarations:
@@ -107,6 +138,8 @@ Tcljack_Register(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *ar
 		return TCL_ERROR; 
 	}
 
+	// Maybe this should return "OK", or the name of the server, or the name of the client, or something.
+	//
 	return TCL_OK;
 }
 
@@ -126,6 +159,7 @@ Tcljack_Deregister(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 
 
 // Retrieve the server's current sampling frequency:
+// TODO: can we also change Fs via libjack?  I'm thinking not.
 static int
 Tcljack_Samplerate(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
@@ -247,6 +281,33 @@ process_jack_buffer(jack_nframes_t nframes, void *arg)
 }
 
 
+// Here's where/how subcommands are handled: a dispatcher function to identify and run subcommands of [jack]:
+static int
+Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
+{
+	// argv[0] is the command name, which would be "jack".
+	if (argc < 2)
+	{
+		Tcl_SetResult(interp, usage_string, TCL_STATIC);
+		return TCL_ERROR;
+	}
+	if (strcmp(argv[1], "register") == 0)
+		return Tcljack_Register(cdata, interp, argc-1, &argv[1]);
+	else if (strcmp(argv[1], "deregister") == 0)
+		return Tcljack_Deregister(cdata, interp, argc-1, &argv[1]);
+	else if (strcmp(argv[1], "samplerate") == 0)
+		return Tcljack_Samplerate(cdata, interp, argc-1, &argv[1]);
+	else if (strcmp(argv[1], "cpuload") == 0)
+		return Tcljack_Cpuload(cdata, interp, argc-1, &argv[1]);
+	else if (strcmp(argv[1], "meter") == 0)
+		return Tcljack_Meter(cdata, interp, argc-1, &argv[1]);
+	else
+	{
+		Tcl_SetResult(interp, usage_string, TCL_STATIC);
+		return TCL_ERROR;
+	}
+}
+
 
  /*
   * _Init -- Called when Tcl loads your extension.
@@ -266,7 +327,9 @@ Tcljack_Init(Tcl_Interp *interp)
 	}
 
 	// Good to go...
-	Tcl_CreateObjCommand(interp, "jack", Tcljack_Hello, NULL, NULL);
+	// Main command is "jack", with subcommands identified and handled by Tcljack_Dispatcher():
+	Tcl_CreateCommand(interp, "jack", Tcljack_Dispatcher, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+	// The following will all be deprecated by having subcommands, handled by Tcljack_Dispatcher():
 	Tcl_CreateObjCommand(interp, "jack_counter", Tcljack_Counter, NULL, NULL);
 	Tcl_CreateCommand(interp, "jack_register", Tcljack_Register, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 	Tcl_CreateCommand(interp, "jack_deregister", Tcljack_Deregister, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
