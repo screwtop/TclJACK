@@ -18,9 +18,10 @@ proc set_transport_visibility {enabled} {
 
 # Should this be parameterised for parent frame, or do we just hard-code it and always assume the transport buttons frame will be at a particular path in the widget tree?  For destroying, it would be easier to just hard-code the location.
 
-proc show_transport_frame {} {
+proc create_transport_frame {} {
 	# First create the frame for the button panel:
-	pack [frame .transport -bg black] -side left
+	frame .transport -bg black
+#	pack [frame .transport -bg black] -side left
 	
 	# Now the buttons themselves:
 
@@ -40,11 +41,12 @@ proc show_transport_frame {} {
 	pack .transport.start .transport.rew .transport.stop .transport.play .transport.pause .transport.ffw .transport.end -side left
 }
 
+proc destroy_transport_frame {} {destroy .transport}
 
+proc show_transport_frame {} {grid .transport -row 0 -column 1}
 
-proc hide_transport_frame {} {
-	destroy .transport
-}
+proc hide_transport_frame {} {grid forget .transport}
+
 
 # REW and FFW buttons are special, in that they need to start responding on button down, and keep going while the button is held down.
 # It may be worth considering having the others respond to press rather than release, as IIRC Ardour's transport buttons do.  This is for faster response, I presume.

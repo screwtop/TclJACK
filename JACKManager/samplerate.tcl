@@ -10,14 +10,17 @@ proc set_samplerate_visibility {enabled} {
 	}
 }
 
-proc show_samplerate {} {
-	pack [menubutton .samplerate  -textvariable jack_sampling_rate_string  -font font_mono  -relief flat]  -side left
+proc create_samplerate {} {
+	menubutton .samplerate  -textvariable jack_sampling_rate_string  -font font_mono  -relief flat
 	# Lastly, start its updates running:
 	every 1000 {set ::jack_sampling_rate_string "[jack samplerate] Hz"}
 
 }
 
-proc hide_samplerate {} {
-	destroy .samplerate
-}
+proc destroy_samplerate {} {destroy .samplerate}
+
+proc show_samplerate {} {grid .samplerate -row 0 -column 3}
+
+proc hide_samplerate {} {grid forget .samplerate}
+
 

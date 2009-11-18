@@ -41,7 +41,7 @@ load ../libtcljack.so
 jack register
 
 # Hmm, should probably define in one place what the external and internal names for the various components should be:
-# set panel_components {{"Transport Controls" transport} {Timecode timecode} {"Sampling Rate" samplerate} {"CPU DSP Load" [cpu]load} {"Audio Meters" meters}}
+set panel_components {{"JACK Menu" menubutton} {"Transport Controls" transport} {Timecode timecode} {"Sampling Rate" samplerate} {"CPU DSP Load" cpuload} {"Audio Meters" meters}}
 
 
 # Initial config for which items should be available.
@@ -52,39 +52,20 @@ set timecode_component_enabled 1
 set cpuload_component_enabled 1
 set samplerate_component_enabled 0
 
-# Should these all be called X_frame?
 
-# TODO: foreach $panel_components ...
 
-# For the JACK control menu button:
-# Actually, no need for a frame for this.
-#frame .menubutton -bg white
-
-# For the transport control panel buttons:
-#frame .transport -bg black
-
-# Actually, don't need frames for these either:
-# For the timecode display:
-#frame .timecode -bg blue
-
-# For sampling rate display:
-#frame .samplerate -bg yellow
-
-# For CPU DSP % utilisation (load) display:
-#frame .cpuload -bg red
-
-# For audio signal level indicator meter gauges:
-#frame .meters -bg black
+# NOTE: If we use Jeff Hobbs's "every" package instead of the simple "every" proc below, we can start and stop these updating for efficiency (e.g. if not being displayed and if the information is otherwise not needed by this program).  TODO: implement.
 
 proc every {ms body} {eval $body; after $ms [info level 0]}
 
 
 # Main menu button:
-pack [menubutton .menubutton  -text "JACK"  -menu .menubutton.menu  -relief groove] -side left
+grid [menubutton .menubutton  -text "JACK"  -menu .menubutton.menu  -relief groove] -column 0
 menu .menubutton.menu
 	.menubutton.menu add command -label $application_name -background grey
 	.menubutton.menu add separator
 	# ... TODO: copy from DeskNerd's jack.tcl
+
 
 
 # Get functionality for the various control panel components:
@@ -94,7 +75,15 @@ source samplerate.tcl
 source cpuload.tcl
 
 # Set them up according to the initial settings (or (TODO) user settings from last time):
-set_transport_visibility $transport_component_enabled
+#foreach component $panel_components {
+#	create_${component}
+#	set_${component}_visibility $${component}_enabled
+#}
+
+create_transport_frame; set_transport_visibility $transport_component_enabled
+create_timecode; set_timecode_visibility $timecode_component_enabled
+create_samplerate; set_samplerate_visibility $samplerate_component_enabled
+create_cpuload; set_cpuload_visibility $cpuload_component_enabled
 
 # Place main UI frame elements on window:
 # I think this is a logical order:
@@ -136,15 +125,5 @@ menu .application_menu
 bind . <3> "tk_popup .application_menu %X %Y"
 
 
-# Set the displayed items updating:
 
-# NOTE: If we use Jeff Hobbs's "every" package, we can start and stop these updating for efficiency (e.g. if not being displayed and if the information is otherwise not needed by this program).  TODO: implement.
-
-# Simple procedure for timed execution of arbitrary code:
-#proc every {ms body} {eval $body; after $ms [info level 0]}
-
-
-# Now now done inside the show procs for the respective components:
-#every 1000 {set ::jack_cpu_load_string [format {%5.1f} [jack cpuload]]%}
-#every 1000 {set ::jack_sampling_rate [jack samplerate]}
 

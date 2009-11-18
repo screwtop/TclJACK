@@ -2,7 +2,7 @@
 
 # Timecode display could be a menu-button, with menu items showing the time (live) in the other measurements.  Selecting one would then change the main display's measurement!  Nifty.  Provided there's enough difference in the displays to tell which is which (although we could add extra label text after it to clarify if necessary).
 
-#pack [menubutton .timecode  -text "00:00:00.000"  -menu .timecode.menu  -font font_mono  -relief groove] -side left
+#pack [menubutton .timecode_frame.timecode  -text "00:00:00.000"  -menu .timecode_frame.timecode.menu  -font font_mono  -relief groove] -side left
 
 
 # TODO: implement actual functionality!
@@ -19,9 +19,9 @@ proc set_timecode_visibility {enabled} {
 	}
 }
 
-proc show_timecode {} {
+proc create_timecode {} {
 	# Can we set a format property to control how the textvariable is displayed?
-	pack [menubutton .timecode  -textvariable jack_timecode_string  -menu .timecode.menu  -font font_mono  -relief flat]  -side left
+	menubutton .timecode  -textvariable jack_timecode_string  -menu .timecode.menu  -font font_mono  -relief flat
 
 	# Set up its context menu:
 	menu .timecode.menu
@@ -35,8 +35,9 @@ proc show_timecode {} {
 #	every 50 {set ::jack_timecode_string [jack timecode]}
 }
 
-proc hide_timecode {} {
-	destroy .timecode
-}
+proc destroy_timecode {} {destroy .timecode}
 
+proc show_timecode {} {grid .timecode -row 0 -column 2}
+
+proc hide_timecode {} {grid forget .timecode}
 
