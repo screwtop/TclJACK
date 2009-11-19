@@ -1,0 +1,28 @@
+# The initial tooltips implementation from http://wiki.tcl.tk/1954 always puts the tooltip below the mouse pointer, which can mean the tooltip is drawn offscreen for items that are near the bottom of the screen.  This is just some working for how to fix this.
+
+# How to find if the mouse pointer is in the lower half of the screen:
+
+# Current mouse pointer screen Y co-ordinate:
+winfo pointery .
+
+# Vertical mid-point of screen:
+expr {[winfo screenheight .] / 2.0}
+
+# Compare:
+[winfo pointery .] > [expr {[winfo screenheight .] / 2.0}]
+
+# Are we in the lower half?
+puts [expr {[winfo pointery .] > [expr {[winfo screenheight .] / 2.0}]}]
+
+# Multiplication factor for the vertical offset:
+expr ([winfo pointery .] > [expr {[winfo screenheight .] / 2.0}]) * -2 + 1
+
+# Check the resulting offset:
+expr {25 * ([expr {[winfo pointery .] > [expr {[winfo screenheight .] / 2.0}]}] * -2 + 1)}
+
+# Maybe break it into multiple lines:
+set pointer_is_low [expr {[winfo pointery .] > [expr {[winfo screenheight .] / 2.0}]}]
+set positionY [expr {[winfo pointery .] + 25 * ($pointer_is_low * -2 + 1)}]
+
+# Good!
+
