@@ -220,6 +220,7 @@ Tcljack_Samplerate(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CO
 // Get timecode from JACK server:
 // The actual timecode is only fleetingly accurate, so I don't think there's any point in storing it in a global variable, and it would be inefficient to query it during the process() callback, so we'll just query it on demand here.
 // This will just return the current frame number; further formatting can be done in higher layers.
+// Actually, JACK seems to have its own timecode feature, which is separate from the basic reporting of transport frame position, AFAICT, so maybe this procedure and the Tcl command it implements is mis-named.
 static int
 Tcljack_Timecode(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
 {

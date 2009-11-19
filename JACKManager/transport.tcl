@@ -27,16 +27,16 @@ proc create_transport {} {
 	# Unicode characters for button labels?  Uniform spacing might be more important (plus Unicode has a conspicuous lack of these common characters, AFAICT).
 	button .transport.start -text {|<} -command {puts start} -font font_mono
 	button .transport.rew   -text {<<} -command {puts rew}   -font font_mono
-	button .transport.stop  -text {[]} -command {puts stop}  -font font_mono
+#	button .transport.stop  -text {[]} -command {puts stop}  -font font_mono
 	button .transport.play  -text { >}  -command {puts play}  -font font_mono
-	#button .transport.stop  -text {▪} -command {puts stop}  -font font_mono
-	#button .transport.play  -text {▸}  -command {puts play}  -font font_mono
+#	button .transport.stop  -text {▪} -command {puts stop}  -font font_mono
+#	button .transport.play  -text {▸}  -command {puts play}  -font font_mono
 	button .transport.pause -text {||} -command {puts pause} -font font_mono
 	button .transport.ffw   -text {>>} -command {puts ffw}   -font font_mono
-	button .transport.end   -text {>|} -command {puts end}   -font font_mono
+#	button .transport.end   -text {>|} -command {puts end}   -font font_mono
 	
 	# Pack transport control buttons in their frame:
-	pack .transport.start .transport.rew .transport.stop .transport.play .transport.pause .transport.ffw .transport.end -side left
+	pack .transport.start .transport.rew .transport.play .transport.pause .transport.ffw -side left
 }
 
 proc destroy_transport {} {destroy .transport}

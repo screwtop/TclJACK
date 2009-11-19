@@ -42,8 +42,9 @@ load ../libtcljack.so
 jack register
 
 # Hmm, should probably define in one place what the external and internal names for the various components should be:
+# TODO: make the ordering here and the grid -column specifiers in the individual component files less fragile.
 set panel_components {{"Main Menu Button" menubutton} {"Transport Controls" transport} {"Timecode Display" timecode} {"Sampling Rate" samplerate} {"CPU DSP Load" cpuload} {"Audio Meters" meters}}
-
+# Maybe put the audio meters after the timecode?  It's more important than Fs and CPU meters.
 
 
 # Initial config for which items should be available.
@@ -53,8 +54,8 @@ set menubutton_component_enabled 1	;# Probably always want this!
 set transport_component_enabled 1
 set timecode_component_enabled 1
 set cpuload_component_enabled 1
-set samplerate_component_enabled 0
-set meters_component_enabled 0
+set samplerate_component_enabled 1
+set meters_component_enabled 1
 
 
 

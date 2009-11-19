@@ -1,4 +1,4 @@
-# JACK control panel element for monitoring the CPU DSP load percentage.
+# JACKManager control panel element for monitoring the CPU DSP load percentage.
 
 # Timecode display could be a menu-button, with menu items showing the time (live) in the other measurements.  Selecting one would then change the main display's measurement!  Nifty.  Provided there's enough difference in the displays to tell which is which (although we could add extra label text after it to clarify if necessary).
 
@@ -16,6 +16,7 @@ proc set_timecode_visibility {enabled} {
 		show_timecode
 	} else {
 		hide_timecode
+		# Might be good to turn off the "every" as well if not enabled, for efficiency.
 	}
 }
 
@@ -47,11 +48,12 @@ proc hide_timecode {} {grid forget .timecode}
 # Here's a procedure for converting raw frame count into nicely formatted hh:mm:ss type display (actually "hhh:mm:ss.mss").
 # Do we want to pass in the sampling rate as well?  Would be more modular that way...
 # Will likely be called as [frames_to_hhmmss [jack timecode] [jack samplerate]].
+# I think JACK itself can only manage 13 and a half hours before it wraps around, so let's only use 2 hour digits.  I prefer no leading padding 0 for the hours (it makes it more obvious that it's the hours field).
 proc frames_to_hhmmss {frame_count sampling_rate} {
 	set remainder_in_seconds [expr double($frame_count) / $sampling_rate]
 
 	set timecode_hours [expr {floor($remainder_in_seconds / 3600.0)}]
-	set timecode_hours_string [format {%3.0f} $timecode_hours]
+	set timecode_hours_string [format {%2.0f} $timecode_hours]
 
 	set remainder_in_seconds [expr {$remainder_in_seconds - $timecode_hours * 3600.0}]
 
@@ -74,5 +76,5 @@ proc frames_to_hhmmss {frame_count sampling_rate} {
 # % frames_to_hhmmss 2455459114.5 44100
 # 15:27:59.345
 #
-# Good. :)  (I think JACK itself can only manage 13 and a half hours before it wraps around.)
+# Good. :)
 
