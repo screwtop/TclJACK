@@ -16,9 +16,9 @@
 
 /* TODO:
  * Figure out how to handle disconnections from JACK properly.
- * Figure out how to implement subcommands.
  * Learn about argument handling, and implement for [jack meter -peak -rms -trough -db].
  * Investigate event handling: how does a Tcl extension declare and generate an event?  Or handle a Tcl event?  Or are these only relevant in Tk, which has an event loop?
+ * Determine whether signal handling is useful or necessary for this library.
  * Implement wrappers for the following:
  * jack_set_sample_rate_callback (to avoid needlessly querying for this; could simply update static variable in this, and/or (perhaps better) trigger a Tcl event)
  * jack_set_buffer_size_callback (similar to above)
@@ -30,7 +30,7 @@
 // Note the naming: Tcljack_Xxx, not TclJACK_Xxx, which didn't seem to work ("couldn't find procedure Tcljack_init").
 
 
-// Hmm, we're gonna need some global variables for holding server connection state, huh?
+// Hmm, we're gonna need some global variables for holding various items of state, huh?
 static int counter = 0;
 static jack_client_t *client;	// That's us!
 static jack_status_t status;
@@ -96,6 +96,11 @@ static char usage_string[] = "Usage forms:"
 // A separate function for checking whether we are currently registered to a JACK server and aborting if not.
 // Actually, since this will have to set up a return value, it might have to be a preprocessor macro.
 #define CHECK_JACK_REGISTRATION_STATUS if (!registered) {interp->result = NOT_REGISTERED_ERROR_STRING; return TCL_ERROR; }
+
+
+
+
+// Now we come to some actual functionality.  There are a few test functions (procedures?) lying around here still.
 
 
 // Forward/stub/whatever declarations:
@@ -189,21 +194,52 @@ Tcljack_Deregister(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 // Retrieve the server's current sampling frequency:
 // TODO: can we also change Fs via libjack?  I'm thinking not.
 static int
-Tcljack_Samplerate(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
+Tcljack_Samplerate(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
 {
 	unsigned int sampling_rate = 0;
-	char output_buffer[6];	// I doubt that sampling rates in the MHz will be very useful for audio.
+//	char output_buffer[6];	// I doubt that sampling rates in the MHz will be very useful for audio.
+	Tcl_Obj *result_pointer;
 
 	// Don't try to do anything if we're not registered (AFAWCT) (to avoid crash):
 	CHECK_JACK_REGISTRATION_STATUS;
 
 	// Find and return sampling rate:
 	sampling_rate = jack_get_sample_rate(client);
-	sprintf(output_buffer, "%d", sampling_rate);
-	Tcl_SetResult(interp, output_buffer, TCL_VOLATILE);
+
+	result_pointer = Tcl_GetObjResult(interp);	
+	Tcl_SetIntObj(result_pointer, sampling_rate);
+
+	// For string interface:
+//	sprintf(output_buffer, "%d", sampling_rate);
+//	Tcl_SetResult(interp, output_buffer, TCL_VOLATILE);
 
 	return TCL_OK;
 }
+
+
+// Get timecode from JACK server:
+// The actual timecode is only fleetingly accurate, so I don't think there's any point in storing it in a global variable, and it would be inefficient to query it during the process() callback, so we'll just query it on demand here.
+// This will just return the current frame number; further formatting can be done in higher layers.
+static int
+Tcljack_Timecode(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
+{
+	jack_position_t current_position;
+	jack_transport_state_t transport_state;
+	jack_nframes_t current_frame_time;
+	Tcl_Obj *result_pointer;
+
+	CHECK_JACK_REGISTRATION_STATUS;
+
+	// Get time info from server:
+	transport_state = jack_transport_query(client, &current_position);
+	current_frame_time = jack_frame_time(client);
+
+	// Currently returns only the current frame position.
+	result_pointer = Tcl_GetObjResult(interp);	
+	Tcl_SetIntObj(result_pointer, current_position.frame);
+	return TCL_OK;
+}
+
 
 // Retrieve the server's current CPU DSP load:
 // TODO: switch to Tcl object interface?
@@ -313,6 +349,7 @@ process_jack_buffer(jack_nframes_t nframes, void *arg)
 
 
 // Here's where/how subcommands are handled: a dispatcher function to identify and run subcommands of [jack]:
+// Can we use the Tcl object interface with this approach, or do all the subcommands uniformly have to return strings?
 static int
 Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
@@ -327,7 +364,9 @@ Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 	else if (strcmp(argv[1], "deregister") == 0)
 		return Tcljack_Deregister(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "samplerate") == 0)
-		return Tcljack_Samplerate(cdata, interp, argc-1, &argv[1]);
+		return Tcljack_Samplerate(cdata, interp, 0, NULL);
+	else if (strcmp(argv[1], "timecode") == 0)
+		return Tcljack_Timecode(cdata, interp, 0, NULL);
 	else if (strcmp(argv[1], "cpuload") == 0)
 		return Tcljack_Cpuload(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "meter") == 0)
@@ -366,7 +405,7 @@ Tcljack_Init(Tcl_Interp *interp)
 	Tcl_CreateObjCommand(interp, "jack_counter", Tcljack_Counter, NULL, NULL);
 	Tcl_CreateCommand(interp, "jack_register", Tcljack_Register, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 	Tcl_CreateCommand(interp, "jack_deregister", Tcljack_Deregister, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
-	Tcl_CreateCommand(interp, "jack_samplerate", Tcljack_Samplerate, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+//	Tcl_CreateCommand(interp, "jack_samplerate", Tcljack_Samplerate, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 	Tcl_CreateCommand(interp, "jack_cpuload", Tcljack_Cpuload, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 
 //	Tcl_CreateCommand(interp, "jack_peak", Tcljack_Peak, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
