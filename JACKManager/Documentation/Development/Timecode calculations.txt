@@ -1,0 +1,49 @@
+# The JACKManager timecode display will show differently formatted values depending on what timecode format the user has selected.  There's an internal variable that holds the stringified timecode in the user's choice of format.  This is just a scratchpad for timecode calculations, especially for converting to hh:mm:ss and bars, beats and ticks.
+
+# We might need to select the maximum field width for the timecode component carefully, to avoid dynamic resizing.  Or would that be such a bad thing, actually?
+# What precision is jack_position_t.frame anyway?  Ardour I think supports only up to 24 hours on the timeline.  Oh, it's jack_frames_t, which is uint32_t.
+
+string length [format {%.0f} [expr pow(2,32)]]
+# 10
+
+string length {00:00:00.000}
+# 12
+
+set jack_timecode_string [jack timecode]
+
+# For raw frame count (i.e. samples):
+set jack_timecode_string [format {%10d} [jack timecode]]
+
+# For period count, we need to know the period size.
+# but assuming 2048 frames/period just for testing...
+set jack_timecode_string [expr {[jack timecode] / 2048.0}]
+
+# For seconds and the like, we need to factor in the sampling frequency (which I have at least already implemented in TclJACK).
+
+# Time in seconds:
+set timecode_in_seconds [expr double([jack timecode]) / [jack samplerate]]
+
+# Do we want days as well?  If hours only, how many hours max?
+# Hours, minutes and seconds:
+
+# Strategy is to deal with the biggest units first, and keep a running track of the amount of time remaining in the "lowest common denominator" unit, seconds (with decimal).
+
+set remainder_in_seconds [expr double([jack timecode]) / [jack samplerate]]
+
+set timecode_hours [expr {floor($remainder_in_seconds / 3600.0)}]
+set timecode_hours_string [format {%3.0f} $timecode_hours]
+
+# Take off the amount we've already dealt with using hours:
+set remainder_in_seconds [expr {$remainder_in_seconds - $timecode_hours * 3600.0}]
+
+set timecode_minutes [expr {floor($remainder_in_seconds / 60.0)}]
+set timecode_minutes_string [format {%02.0f} $timecode_minutes]
+
+# Take off the amount dealt with using minutes:
+set remainder_in_seconds [expr {$remainder_in_seconds - $timecode_minutes * 60.0}]
+
+# Seconds are all that's left:
+set timecode_seconds_string [format {%06.3f} $remainder_in_seconds]
+
+puts "$timecode_hours_string:$timecode_minutes_string:$timecode_seconds_string"
+
