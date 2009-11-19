@@ -1,4 +1,3 @@
-#!wish
 #!/usr/bin/wish
 # Basic test using TclJACK to produce a Stevens loudness meter (single channel).
 
@@ -11,8 +10,8 @@ set indicator_height 600
 
 
 # Container frame:
-pack [frame .sound_gauge  -width $indicator_width  -height $indicator_height  -relief sunken  -borderwidth 1 -background black] -side left
-        
+grid [frame .sound_gauge  -width $indicator_width  -height $indicator_height  -relief sunken  -borderwidth 1 -background black] -row 0 -column 0
+
 # Meter gauge is also simply done as a frame:
 place [frame .sound_gauge.meter     -width [expr {$indicator_width-2}] -height 0  -relief flat -borderwidth 0 -background green] -anchor sw -x 0 -y [expr {$indicator_height-2}]
 
@@ -42,8 +41,10 @@ proc sound_gauge_update {raw_level} {
 # Procedure for timed execution of arbitrary code:
 proc every {ms body} {eval $body; after $ms [info level 0]}
 
-set nmax 10
-every 50 {sound_gauge_update [jack meter]}; if {[incr ::nmax -1]<=0} return}
+#set nmax 10
+#every 50 {sound_gauge_update [jack meter -rms]}; if {[incr ::nmax -1]<=0} return}
+every 50 {sound_gauge_update [lindex [jack meter] 1]}
+#every 50 {sound_gauge_update [jack meter]}; if {[incr ::nmax -1]<=0} return}
 # Hmm, that seems to keep going indefinitely instead of stopping after 10 reps.
 
 # jack deregister
