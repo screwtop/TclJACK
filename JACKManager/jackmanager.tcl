@@ -10,6 +10,8 @@
 # - Current sampling rate
 # - Current CPU DSP load
 # - Audio level meters (1, 2, or n?)
+# - Tempo and time signature
+# - XRUN count/alert
 
 # Changing the colours of the transport buttons to indicate current state might be nice.
 # Right-click menu to toggle the main UI elements in case of limited space (esp. likely when docked in systray).
@@ -27,103 +29,68 @@ wm title . $application_name
 
 source Preferences.tcl
 
-# TODO: monospaced font for transport button glyphs and time display.
-#font create font_mono -family fixed -size 6
-#font create font_mono -family lucy -size 8
-#font create font_mono -family lucidatypewriter -size -19
-#font create font_sans -family Helvetica -size -12
-#font create font_sans -family cure -size -10	;# About as small as it gets.
-#option add *font font_sans
-
-
 # Might as well actually connect to JACK, since we can...
 load ../libtcljack.so
 jack register
 
 # Hmm, should probably define in one place what the external and internal names for the various components should be:
-set panel_components {{"JACK Menu" menubutton} {"Transport Controls" transport} {Timecode timecode} {"Sampling Rate" samplerate} {"CPU DSP Load" cpuload} {"Audio Meters" meters}}
+set panel_components {{"JACKManager" menubutton} {"Transport Controls" transport} {"Timecode Display" timecode} {"Sampling Rate" samplerate} {"CPU DSP Load" cpuload} {"Audio Meters" meters}}
+
 
 
 # Initial config for which items should be available.
 # TODO: some kind of persistence mechanism for these?  Or put them in Preferences.tcl?
 # Perhaps just all on by default, so foreach $panel_components ...
+set menubutton_component_enabled 1	;# Probably always want this!
 set transport_component_enabled 1
 set timecode_component_enabled 1
 set cpuload_component_enabled 1
 set samplerate_component_enabled 0
+set meters_component_enabled 0
 
 
-
+# Routine fro timed execution of specific code (used in updating the timecode display, CPU load, etc.).
 # NOTE: If we use Jeff Hobbs's "every" package instead of the simple "every" proc below, we can start and stop these updating for efficiency (e.g. if not being displayed and if the information is otherwise not needed by this program).  TODO: implement.
 
 proc every {ms body} {eval $body; after $ms [info level 0]}
 
 
-# Main menu button:
-grid [menubutton .menubutton  -text "JACK"  -menu .menubutton.menu  -relief groove] -column 0
-menu .menubutton.menu
-	.menubutton.menu add command -label $application_name -background grey
-	.menubutton.menu add separator
-	# ... TODO: copy from DeskNerd's jack.tcl
-
-
-
-# Get functionality for the various control panel components:
-source transport.tcl
-source timecode.tcl
-source samplerate.tcl
-source cpuload.tcl
-
-# Set them up according to the initial settings (or (TODO) user settings from last time):
-#foreach component $panel_components {
-#	create_${component}
-#	set_${component}_visibility $${component}_enabled
-#}
-
-create_transport_frame; set_transport_visibility $transport_component_enabled
-create_timecode; set_timecode_visibility $timecode_component_enabled
-create_samplerate; set_samplerate_visibility $samplerate_component_enabled
-create_cpuload; set_cpuload_visibility $cpuload_component_enabled
-
-# Place main UI frame elements on window:
-# I think this is a logical order:
-#pack .menubutton .transport .timecode .samplerate .cpuload .meters -side left
-# TODO: figure out a way to 
-
-# Hmm, we'll be wanting a timecode display as well (hh:mm:ss, bars and beats, etc.)
-# ...and tempo controls?
-
-
-# Maybe this should be a label, if there's no actual menu attached.  Then we can use a textvariable.  No, can use with menubutton.  Plus using menubutton ensures consistent widget heights.
-#pack [menubutton .cpuload.displaybutton  -text " 2.35%"  -font font_mono  -relief flat]
-#set jack_cpu_load_string {?}
-# Can we set a format property to control how the textvariable is displayed?
-#pack [menubutton .cpuload  -textvariable jack_cpu_load_string  -font font_mono  -relief flat]
-
-
-# Sampling rate display:
-#set jack_sampling_rate {?}
-#pack [menubutton .samplerate.display  -textvariable jack_sampling_rate  -font font_mono  -relief flat]
+# Set up the various control panel components according to the initial settings (or (TODO) user settings from last time):
+foreach component $panel_components {
+	set component_id [lindex $component 1]
+	source ${component_id}.tcl
+	create_${component_id}
+	set_${component_id}_visibility [set ${component_id}_component_enabled]
+}
 
 
 # OK, now how about the context menu, with the ability to turn the various panel items on and off (use checkbox-menuitems).
 # Can we attach event handlers to variables?  Kinda like database triggers?  So if $display_timecode_component is set to false, it just disappears?  menu checkbuttons can have -command and -variable specifiec; does the variable get set first, so the command can reliabliy use it its body?
 
+destroy .application_menu
 menu .application_menu
-	# TODO: foreach ... $panel_components ... {.application_menu add checkbutton ...}
-	.application_menu add checkbutton -label {Transport Controls} -variable transport_component_enabled  -command {set_transport_visibility $transport_component_enabled}
-	.application_menu add checkbutton -label {Timecode Display} -variable timecode_component_enabled  -command {set_timecode_visibility $timecode_component_enabled}	;# Or "Timecode Clock" or "Clock" or "Clock Display"?
-	.application_menu add checkbutton -label {Sampling Rate} -variable samplerate_component_enabled  -command {set_samplerate_visibility $samplerate_component_enabled}
-	.application_menu add checkbutton -label {CPU DSP Load} -variable cpuload_component_enabled  -command {set_cpuload_visibility $cpuload_component_enabled}
-	.application_menu add checkbutton -label {Audio Meters} -variable display_meters_component  -command {puts {Audio Meters element toggled}}
+	# Set up a toggle menu item for each panel component:
+	foreach component $panel_components {
+		set component_label [lindex $component 0]
+		set component_id [lindex $component 1]
+		puts "$component_label -> $component_id"
+		.application_menu add checkbutton -label $component_label -variable ${component_id}_component_enabled  -command "set_${component_id}_visibility \$${component_id}_component_enabled"
+	}
+
+	# The following is for troubleshooting resizing behaviour when showing/hiding items in the layout grid inside Ion3's statusbar systray:
+	.application_menu add separator
+	.application_menu add command -label {Query Window Geometry} -command {puts [wm geometry .]}
+
 	# +Connect to/disconnect from JACK server
 	#.application_menu add separator
 	# ...
+
 	# +Change JACK server (can we discover names of multiple JACK servers?)
+
 	.application_menu add separator
 	.application_menu add command -label {Close} -background orange -command {exit}
 bind . <3> "tk_popup .application_menu %X %Y"
 
 
-
+# Now onward to the event loop...
 

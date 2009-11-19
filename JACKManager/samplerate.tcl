@@ -1,4 +1,4 @@
-# JACK control panel element for monitoring the sampling rate.
+# JACKManager control panel element for monitoring the sampling rate.
 
 set jack_sampling_rate_string {?}
 

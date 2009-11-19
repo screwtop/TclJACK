@@ -1,4 +1,4 @@
-# JACK control panel element for monitoring the CPU DSP load percentage.
+# JACKManager control panel element for monitoring the CPU DSP load percentage.
 
 set jack_cpu_load_string {?}
 
