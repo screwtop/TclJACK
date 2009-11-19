@@ -12,9 +12,9 @@ proc set_samplerate_visibility {enabled} {
 
 proc create_samplerate {} {
 	menubutton .samplerate  -textvariable jack_sampling_rate_string  -font font_mono  -relief flat
+	setTooltip .samplerate {Hardware sampling frequency}
 	# Lastly, start its updates running:
-	every 1000 {set ::jack_sampling_rate_string "[jack samplerate] Hz"}
-
+	every 1000 {set ::jack_sampling_rate_string "[format {%6d} [jack samplerate]] Hz"}
 }
 
 proc destroy_samplerate {} {destroy .samplerate}

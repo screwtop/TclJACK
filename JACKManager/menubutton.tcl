@@ -13,10 +13,11 @@ proc create_menubutton {} {
 	global application_name
 	# Main menu button:
 	menubutton .menubutton  -text "JACK"  -menu .menubutton.menu  -relief groove
+	setTooltip .menubutton {JACKManager menu button}
 	menu .menubutton.menu
 		.menubutton.menu add command -label $application_name -background grey
 		.menubutton.menu add separator
-		# ... TODO: copy from DeskNerd's jack.tcl
+		# ... TODO: copy other stuff from DeskNerd's jack.tcl
 }
 
 proc destroy_menubutton {} {destroy .menubutton}

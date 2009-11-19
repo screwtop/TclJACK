@@ -22,6 +22,7 @@ proc set_timecode_visibility {enabled} {
 proc create_timecode {} {
 	# Can we set a format property to control how the textvariable is displayed?
 	menubutton .timecode  -textvariable jack_timecode_string  -menu .timecode.menu  -font font_mono  -relief flat
+	setTooltip .timecode {JACK transport timecode}
 
 	# Set up its context menu:
 	menu .timecode.menu

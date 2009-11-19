@@ -29,12 +29,20 @@ wm title . $application_name
 
 source Preferences.tcl
 
+# Routine for timed execution of specific code (used in updating the timecode display, CPU load, etc.).
+# NOTE: If we use Jeff Hobbs's "every" package instead of the simple "every" proc below, we can start and stop these updating for efficiency (e.g. if not being displayed and if the information is otherwise not needed by this program).  NOTE: even if you destroy the component being updated with destroy_<component>, the [every] persists!  TODO: implement.
+
+proc every {ms body} {eval $body; after $ms [info level 0]}
+
+source tooltips.tcl
+
+
 # Might as well actually connect to JACK, since we can...
 load ../libtcljack.so
 jack register
 
 # Hmm, should probably define in one place what the external and internal names for the various components should be:
-set panel_components {{"JACKManager" menubutton} {"Transport Controls" transport} {"Timecode Display" timecode} {"Sampling Rate" samplerate} {"CPU DSP Load" cpuload} {"Audio Meters" meters}}
+set panel_components {{"Main Menu Button" menubutton} {"Transport Controls" transport} {"Timecode Display" timecode} {"Sampling Rate" samplerate} {"CPU DSP Load" cpuload} {"Audio Meters" meters}}
 
 
 
@@ -48,11 +56,6 @@ set cpuload_component_enabled 1
 set samplerate_component_enabled 0
 set meters_component_enabled 0
 
-
-# Routine fro timed execution of specific code (used in updating the timecode display, CPU load, etc.).
-# NOTE: If we use Jeff Hobbs's "every" package instead of the simple "every" proc below, we can start and stop these updating for efficiency (e.g. if not being displayed and if the information is otherwise not needed by this program).  TODO: implement.
-
-proc every {ms body} {eval $body; after $ms [info level 0]}
 
 
 # Set up the various control panel components according to the initial settings (or (TODO) user settings from last time):
@@ -73,13 +76,12 @@ menu .application_menu
 	foreach component $panel_components {
 		set component_label [lindex $component 0]
 		set component_id [lindex $component 1]
-		puts "$component_label -> $component_id"
 		.application_menu add checkbutton -label $component_label -variable ${component_id}_component_enabled  -command "set_${component_id}_visibility \$${component_id}_component_enabled"
 	}
 
 	# The following is for troubleshooting resizing behaviour when showing/hiding items in the layout grid inside Ion3's statusbar systray:
 	.application_menu add separator
-	.application_menu add command -label {Query Window Geometry} -command {puts [wm geometry .]}
+	.application_menu add command -label {Query Window Geometry (debugging)} -command {puts [wm geometry .]}
 
 	# +Connect to/disconnect from JACK server
 	#.application_menu add separator
@@ -88,7 +90,7 @@ menu .application_menu
 	# +Change JACK server (can we discover names of multiple JACK servers?)
 
 	.application_menu add separator
-	.application_menu add command -label {Close} -background orange -command {exit}
+	.application_menu add command -label {Close} -background orange -command {jack deregister; exit}
 bind . <3> "tk_popup .application_menu %X %Y"
 
 
