@@ -24,8 +24,14 @@
 # TODO: merge in existing stuff from the DeskNerd JACK component (I think it belongs here more) in working towards the proper version of this.
 # TODO: add an xrun counter or alert; perhaps another menubutton, showing the total xrun count, with popup menu items showing the log of recent xruns.  The button could flash red whenever an xrun occurs to alert the user.
 
+#wm withdraw .	;# Hide the window initially, until everything is set up
+
 set application_name {JACKManager}
 wm title . $application_name
+
+# Temporarily remove the window from being managed by the WM, so that the initial window geometry will be unaffected by the window manager (e.g. Ion).
+wm overrideredirect . 1
+#wm transient .
 
 source Preferences.tcl
 
@@ -67,11 +73,15 @@ foreach component $panel_components {
 	set_${component_id}_visibility [set ${component_id}_component_enabled]
 }
 
+# Maybe could try some flashier visual styles:
+#. configure -padx 3 -pady 3 -background darkgrey
+.transport configure -relief groove -bg black -border 2 -padx 1 -pady 1
+
 
 # OK, now how about the context menu, with the ability to turn the various panel items on and off (use checkbox-menuitems).
 # Can we attach event handlers to variables?  Kinda like database triggers?  So if $display_timecode_component is set to false, it just disappears?  menu checkbuttons can have -command and -variable specifiec; does the variable get set first, so the command can reliabliy use it its body?
 
-destroy .application_menu
+#destroy .application_menu
 menu .application_menu
 	# Set up a toggle menu item for each panel component:
 	foreach component $panel_components {
@@ -80,9 +90,6 @@ menu .application_menu
 		.application_menu add checkbutton -label $component_label -variable ${component_id}_component_enabled  -command "set_${component_id}_visibility \$${component_id}_component_enabled"
 	}
 
-	# The following is for troubleshooting resizing behaviour when showing/hiding items in the layout grid inside Ion3's statusbar systray:
-	.application_menu add separator
-	.application_menu add command -label {Query Window Geometry (debugging)} -command {puts [wm geometry .]}
 
 	# +Connect to/disconnect from JACK server
 	#.application_menu add separator
@@ -90,10 +97,26 @@ menu .application_menu
 
 	# +Change JACK server (can we discover names of multiple JACK servers?)
 
+	# Optional debugging menu:
+	source debugging_menu.tcl
+
 	.application_menu add separator
 	.application_menu add command -label {Close} -background orange -command {jack deregister; exit}
 bind . <3> "tk_popup .application_menu %X %Y"
 
+
+
+
+# In order to get proper layout inside Ion's statusbar, we have to set the minimum window size.
+# Ideally we would somehow use winfo to figure out what the size should be; normally Tk would do this itself but the initial window geometry is constrained by Ion's tiling.  I'm not sure if you can remove the window from the wm management early enough to avoid this.
+#puts [wm geometry .]
+#wm minsize . 300 32
+# Depending on the timing, it may be necessary to toggle the window's visibility to get Ion to recognise and grab it into the systray.
+#wm withdraw .	;# Maybe this could go at the beginning of this script.
+#wm deiconify .
+puts [wm geometry .]
+# Ah, need a delay (not sure how much or how reliable this is) to allow Tk to enter event loop and have window set up before querying window geometry.
+after 1 {puts [wm geometry .]}
 
 # Now onward to the event loop...
 

@@ -25,15 +25,17 @@ proc create_transport {} {
 
 	# Play, Stop, Pause (Stop is really Pause), Record? (only applicable to clients that do recording; not global), Start, End ?? (special cases of Locate)
 	# Unicode characters for button labels?  Uniform spacing might be more important (plus Unicode has a conspicuous lack of these common characters, AFAICT).
-	button .transport.start -text {|<} -command {puts start} -font font_mono
+	# If we're rolling, should hitting "|<" stop the transport or leave it rolling?
+	# TODO: have play and pause buttons change colour to indicate transport state.
+	button .transport.start -text {|<} -command {jack transport locate 0} -font font_mono
 	button .transport.rew   -text {<<} -command {puts rew}   -font font_mono
-#	button .transport.stop  -text {[]} -command {puts stop}  -font font_mono
-	button .transport.play  -text { >}  -command {puts play}  -font font_mono
-#	button .transport.stop  -text {▪} -command {puts stop}  -font font_mono
-#	button .transport.play  -text {▸}  -command {puts play}  -font font_mono
-	button .transport.pause -text {||} -command {puts pause} -font font_mono
+#	button .transport.stop  -text {[]} -command {jack transport stop}  -font font_mono
+	button .transport.play  -text { >}  -command {jack transport start}  -font font_mono
+#	button .transport.stop  -text {▪} -command {jack transport stop}  -font font_mono
+#	button .transport.play  -text {▸}  -command {jack transport start}  -font font_mono
+	button .transport.pause -text {||} -command {jack transport stop} -font font_mono
 	button .transport.ffw   -text {>>} -command {puts ffw}   -font font_mono
-#	button .transport.end   -text {>|} -command {puts end}   -font font_mono
+#	button .transport.end   -text {>|} -command {jack transport locate -1}   -font font_mono	;# Ha ha, not really -1.
 	
 	# Pack transport control buttons in their frame:
 	pack .transport.start .transport.rew .transport.play .transport.pause .transport.ffw -side left
