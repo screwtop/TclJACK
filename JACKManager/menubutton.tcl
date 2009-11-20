@@ -12,7 +12,7 @@ proc set_menubutton_visibility {enabled} {
 proc create_menubutton {} {
 	global application_name
 	# Main menu button:
-	menubutton .menubutton  -text "JACK"  -menu .menubutton.menu  -relief groove
+	menubutton .menubutton  -text "JACK"  -menu .menubutton.menu  -relief groove -padx 0.5m -pady 1m -cursor {arrow}
 	setTooltip .menubutton {JACKManager menu button}
 	menu .menubutton.menu
 		.menubutton.menu add command -label $application_name -background grey

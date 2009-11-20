@@ -5,8 +5,7 @@
 #pack [menubutton .timecode_frame.timecode  -text "00:00:00.000"  -menu .timecode_frame.timecode.menu  -font font_mono  -relief groove] -side left
 
 
-# TODO: implement actual functionality!
-# TODO: handle user preference for timecode clock display format.
+# TODO: handle user preference for timecode clock display format (i.e. remembering, not a whole custom format model implementation).
 
 
 set jack_timecode_string {00:00:00.000}
@@ -22,7 +21,7 @@ proc set_timecode_visibility {enabled} {
 
 proc create_timecode {} {
 	# Can we set a format property to control how the textvariable is displayed?
-	menubutton .timecode  -textvariable jack_timecode_string  -menu .timecode.menu  -font font_mono  -relief flat
+	menubutton .timecode  -textvariable jack_timecode_string  -menu .timecode.menu  -font font_mono  -relief flat -cursor {arrow}
 	setTooltip .timecode {JACK transport timecode}
 
 	# Set up its context menu:

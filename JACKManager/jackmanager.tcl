@@ -49,7 +49,14 @@ jack register
 
 # Hmm, should probably define in one place what the external and internal names for the various components should be:
 # TODO: make the ordering here and the grid -column specifiers in the individual component files less fragile.
-set panel_components {{"Main Menu Button" menubutton} {"Transport Controls" transport} {"Timecode Display" timecode} {"Sampling Rate" samplerate} {"CPU DSP Load" cpuload} {"Audio Meters" meters}}
+set panel_components {
+	{"Main Menu Button"   menubutton}
+	{"Transport Controls" transport}
+	{"Timecode Display"   timecode}
+	{"Sampling Rate"      samplerate}
+	{"CPU DSP Load"       cpuload}
+	{"Audio Meters"       meters}
+}
 # Maybe put the audio meters after the timecode?  It's more important than Fs and CPU meters.
 
 
@@ -73,15 +80,11 @@ foreach component $panel_components {
 	set_${component_id}_visibility [set ${component_id}_component_enabled]
 }
 
-# Maybe could try some flashier visual styles:
-#. configure -padx 3 -pady 3 -background darkgrey
-.transport configure -relief groove -bg black -border 2 -padx 1 -pady 1
 
 
 # OK, now how about the context menu, with the ability to turn the various panel items on and off (use checkbox-menuitems).
 # Can we attach event handlers to variables?  Kinda like database triggers?  So if $display_timecode_component is set to false, it just disappears?  menu checkbuttons can have -command and -variable specifiec; does the variable get set first, so the command can reliabliy use it its body?
 
-#destroy .application_menu
 menu .application_menu
 	# Set up a toggle menu item for each panel component:
 	foreach component $panel_components {
@@ -89,7 +92,6 @@ menu .application_menu
 		set component_id [lindex $component 1]
 		.application_menu add checkbutton -label $component_label -variable ${component_id}_component_enabled  -command "set_${component_id}_visibility \$${component_id}_component_enabled"
 	}
-
 
 	# +Connect to/disconnect from JACK server
 	#.application_menu add separator
@@ -106,6 +108,9 @@ bind . <3> "tk_popup .application_menu %X %Y"
 
 
 
+# For floating window mode, give the background a suitable cursor
+source floating.tcl
+
 
 # In order to get proper layout inside Ion's statusbar, we have to set the minimum window size.
 # Ideally we would somehow use winfo to figure out what the size should be; normally Tk would do this itself but the initial window geometry is constrained by Ion's tiling.  I'm not sure if you can remove the window from the wm management early enough to avoid this.
@@ -114,9 +119,19 @@ bind . <3> "tk_popup .application_menu %X %Y"
 # Depending on the timing, it may be necessary to toggle the window's visibility to get Ion to recognise and grab it into the systray.
 #wm withdraw .	;# Maybe this could go at the beginning of this script.
 #wm deiconify .
-puts [wm geometry .]
+#puts [wm geometry .]
 # Ah, need a delay (not sure how much or how reliable this is) to allow Tk to enter event loop and have window set up before querying window geometry.
-after 1 {puts [wm geometry .]}
+
+#after 10 {
+#	puts [wm geometry .]
+#	wm minsize . [winfo width .] [winfo height .]
+#	puts [wm minsize .]
+#	wm overrideredirect . 0
+#	wm withdraw .; wm deiconify .
+#}
+
+# I suspect we'll need to do something like that after every show/hide of a panel component, to get Ion to register the window size change.  Not sure if it'll take over the window sizing itself also!
+
 
 # Now onward to the event loop...
 

@@ -18,8 +18,7 @@ proc set_transport_visibility {enabled} {
 
 proc create_transport {} {
 	# First create the frame for the button panel:
-	frame .transport -bg black
-#	pack [frame .transport -bg black] -side left
+	frame .transport -relief groove -bg black -border 2 -padx 1 -pady 1
 	
 	# Now the buttons themselves:
 
@@ -27,18 +26,25 @@ proc create_transport {} {
 	# Unicode characters for button labels?  Uniform spacing might be more important (plus Unicode has a conspicuous lack of these common characters, AFAICT).
 	# If we're rolling, should hitting "|<" stop the transport or leave it rolling?
 	# TODO: have play and pause buttons change colour to indicate transport state.
-	button .transport.start -text {|<} -command {jack transport locate 0} -font font_mono
-	button .transport.rew   -text {<<} -command {puts rew}   -font font_mono
-#	button .transport.stop  -text {[]} -command {jack transport stop}  -font font_mono
-	button .transport.play  -text { >}  -command {jack transport start}  -font font_mono
-#	button .transport.stop  -text {▪} -command {jack transport stop}  -font font_mono
-#	button .transport.play  -text {▸}  -command {jack transport start}  -font font_mono
-	button .transport.pause -text {||} -command {jack transport stop} -font font_mono
-	button .transport.ffw   -text {>>} -command {puts ffw}   -font font_mono
-#	button .transport.end   -text {>|} -command {jack transport locate -1}   -font font_mono	;# Ha ha, not really -1.
-	
-	# Pack transport control buttons in their frame:
-	pack .transport.start .transport.rew .transport.play .transport.pause .transport.ffw -side left
+	# Alternative chars: ▪ ▸
+	set transport_buttons {
+		{start {|<} {Return to Start}          {jack transport locate 0}}
+		{rew   {<<} {Rewind}                   {puts rew}}
+		{stop  {[]} {Stop and Return to Start} {jack transport stop; jack transport locate 0}}
+		{play  { >} {Play}                     {jack transport start}}
+		{pause {||} {Pause/Stop}               {jack transport stop}}
+		{ffw   {>>} {Fast Forward}             {puts ffw}}
+	}
+
+	foreach button $transport_buttons {
+		set name [lindex $button 0]
+		set caption [lindex $button 1]
+		set tooltip [lindex $button 2]
+		set command [lindex $button 3]
+		button .transport.$name -text $caption -command $command -font font_mono -padx 1m -pady 1m -cursor hand1
+		setTooltip .transport.$name $tooltip
+		pack .transport.$name -side left
+	}
 }
 
 proc destroy_transport {} {destroy .transport}

@@ -25,6 +25,7 @@ font create font_sans -family Helvetica -size -12	;# -size is in what units?  Ah
 
 # TODO: colours, e.g. statusbar background and foreground?
 # ion3 statusbar: 0x50 background, 0xa0 text
+# Should perhaps be using a namespace for these...
 set statusbar_background_colour {#505050}
 set statusbar_foreground_colour {#a0a0a0}
 . configure -background $statusbar_background_colour
@@ -38,7 +39,7 @@ option add *Menu.relief raised widgetDefault	;# This definitely works (try "sunk
 option add *MenuButton.background red
 #option add *Thickness 32 widgetDefault
 #option add *Menubutton.Pad 32 widgetDefault
-option add *Cursor hand2 widgetDefault
+#option add *Cursor hand2 widgetDefault
 
 # Here's some stuff from http://wiki.tcl.tk/10569 that might/should work:
 #   option add *Menu.activeBackground #4a6984
