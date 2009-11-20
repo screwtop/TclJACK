@@ -82,9 +82,11 @@ static const char* tcljack_version = "0.1";
 static char usage_string[] = "Usage forms:"
 	"\n	jack register"
 	"\n	jack deregister"
+	"\n	jack transport"
+	"\n	jack timecode"
+	"\n	jack meter"
 	"\n	jack samplerate"
 	"\n	jack cpuload"
-	"\n	jack meter"
 //	"	jack info ()\n"
 //	"	jack meter -peak -rms -trough\n"
 ;
@@ -108,6 +110,7 @@ int process_jack_buffer(jack_nframes_t nframes, void *arg);
 
 
 // Just a dummy "hello world" routine:
+// TODO: turn this into a "version" command, perhaps (reporting libjack's or TclJACK's version?).
 static int
 Tcljack_Hello(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
 {
@@ -307,6 +310,49 @@ Tcljack_Peak(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[]
 
 
 
+// Some basic transport-related commands; perhaps bundle these into a single procedure for "transport".
+static int
+Tcljack_Transport(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
+{
+	CHECK_JACK_REGISTRATION_STATUS;
+
+	// argv[0] is the subcommand name, which would be "transport".
+	if (argc < 2)
+	{
+		Tcl_SetResult(interp, "Usage: jack transport ( start | stop | locate <frame> )", TCL_STATIC);
+		return TCL_ERROR;
+	}
+	if (strcmp(argv[1], "start") == 0 || strcmp(argv[1], "play") == 0 || strcmp(argv[1], "unpause") == 0)
+	{
+		jack_transport_start(client);
+		return TCL_OK;
+	}
+	else if (strcmp(argv[1], "stop") == 0 || strcmp(argv[1], "pause") == 0)
+	{
+		jack_transport_stop(client);
+		return TCL_OK;
+	}
+	else if (strcmp(argv[1], "locate") == 0 || strcmp(argv[1], "seek") == 0 || strcmp(argv[1], "position") == 0)
+	{
+		if (argc == 3)
+			jack_transport_locate(client, atoi(argv[2]));
+		else
+		{
+			// TODO: "locate"-specific usage message:
+			Tcl_SetResult(interp, "Usage: jack transport locate <frame>", TCL_STATIC);
+			return TCL_ERROR;	
+		}
+	}
+	else
+	{
+		// TODO: "transport"-specific usage message:
+		Tcl_SetResult(interp, "Usage: jack transport ( start | stop | locate <frame> )", TCL_STATIC);
+		return TCL_ERROR;
+	}
+	return TCL_OK;
+}
+
+
 // For monitoring, we'll need to set up a port (or two, or n) to receive audio, and define a JACK process() callback fuction.  We've called it process_jack_buffer.
 // This will have level metering capability, calculating statistics over the current JACK sample buffer, and copying the results into the relevant global variables from which they can be read asynchronously from Tcl.
 int
@@ -369,9 +415,11 @@ Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 	else if (strcmp(argv[1], "timecode") == 0)
 		return Tcljack_Timecode(cdata, interp, 0, NULL);
 	else if (strcmp(argv[1], "cpuload") == 0)
-		return Tcljack_Cpuload(cdata, interp, argc-1, &argv[1]);
+		return Tcljack_Cpuload(cdata, interp, 0, NULL);
 	else if (strcmp(argv[1], "meter") == 0)
 		return Tcljack_Meter(cdata, interp, argc-1, &argv[1]);
+	else if (strcmp(argv[1], "transport") == 0)
+		return Tcljack_Transport(cdata, interp, argc-1, &argv[1]);
 	else
 	{
 		Tcl_SetResult(interp, usage_string, TCL_STATIC);
