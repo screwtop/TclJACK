@@ -2,7 +2,7 @@ What commands do I want for this thing, and what arguments should they support? 
 
 # Connecting to JACK server.
 # Should we support multiple connections?  What would Fons do...? ;^)
-# "connect" or "register"?  I think "register" is more correct; "connect" could be required for establishing port connections!
+# "connect" or "register"?  I think "register" is more correct; the term "connect" should probably be reserved for establishing port connections!
 jack register [ -server <servername> ]
 jack deregister [ -server <servername> ]
 
@@ -16,6 +16,10 @@ jack query ... OR jack info ...
 	playback_ports	OR sink_ports OR out_ports
 	client name (may be auto-modified by server for uniqueness)
 
+# Ideally we'd allow you to create and destroy input ports for monitoring/metering.  These could optionally have a supplied name.
+jack port create ...
+jack port destroy ...
+
 # Managing port-to-port connections:
 jack connect <source-port> <sink-port>	OR jack port_connect ...
 jack disconnect <source-port> <sink-port>
@@ -28,6 +32,14 @@ jack level OR jack monitor OR jack meter
 	-db OR -dB or -decibels
 	histogram
 	possible DC offset
+	-port <name> ;# If we're allowing you to create named ports, this would be kind of necessary.
 
 # Hmm, if separate command invocations are required for peak, trough and RMS levels, it might be problematic if the calling program is expected them to be for the same time window.  So, probably a single [jack meter] or [jack level] command that can report any (or all) measurements at once would be the way to go.
+
+
+# A subcommand for transport with further subcommands?  Could base on jack_transport command, maybe with some aliases.
+jack transport play | jack transport start
+jack transport stop | jack transport pause
+jack transport locate | jack transport seek | jack transport position
+# + tempo stuff?  Timebase master/release?
 
