@@ -1,0 +1,18 @@
+tcljack.c
+[ ] Server auto-start?
+[ ] Query real-time mode?
+[ ] Dynamic port allocation for n-channel metering.
+
+JACKManager:
+[ ] A mechanism for starting and stopping the JACK server itself.
+	[ ] A JACK settings profiles management mechanism?
+[ ] Transport FFW and REW functionality.
+[ ] Looping functionality?
+[ ] Pixmaps or suitable Unicode characters for transport buttons.
+[ ] Add/remove meters+ports.
+[ ] User preferences mechanism.  Colour schemes?
+[ ] Transfer and adapt main menu from 
+[ ] Maybe split main menu into multiple menus: Connections, Server Control
+[ ] JACK server messages window.
+[ ] XRUN meter component.
+
