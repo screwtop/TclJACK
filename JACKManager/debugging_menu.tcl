@@ -1,7 +1,10 @@
-	# Optional debugging menu (trying to suss out some WM interactions)
+	# Optional debugging menu (mainly trying to suss out some WM interactions)
 
 	.application_menu add separator
 	.application_menu add cascade -menu [menu .application_menu.debugging_menu] -label {Debugging}
+		# TODO: make disconnecting halt the display updates (which will fail if not connected, of course).
+		.application_menu.debugging_menu add command -label {JACK Disconnect} -command {jack deregister}
+		.application_menu.debugging_menu add command -label {JACK Reconnect} -command {jack register}
 		# The following is for troubleshooting resizing behaviour when showing/hiding items in the layout grid inside Ion3's statusbar systray:
 		.application_menu.debugging_menu add command -label {Query Window Geometry} -command {puts [wm geometry .]}
 		.application_menu.debugging_menu add command -label {Query Window minsize} -command {puts [wm minsize .]}

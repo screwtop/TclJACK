@@ -39,14 +39,17 @@ proc showTooltip {widget text} {
 	set width [winfo reqwidth $tooltip.label]
 	set height [winfo reqheight $tooltip.label]
 	
-	set pointer_is_low [expr {[winfo pointery .] > [expr {[winfo screenheight .] / 2.0}]}]
+	set pointer_below_midline [expr {[winfo pointery .] > [expr {[winfo screenheight .] / 2.0}]}]	;# Is the pointer in the bottom half of the screen?
 	
-	set positionX [winfo pointerx .]
-	set positionY [expr [winfo pointery .] + 25 * ($pointer_is_low * -2 + 1)]
+	set positionX [expr {[winfo pointerx .] - round($width / 2.0)}]	;# Tooltip is centred horizontally on pointer.
+	set positionY [expr [winfo pointery .] + 35 * ($pointer_below_midline * -2 + 1) - round($height / 2.0)]	;# Tooltip is displayed above or below depending on pointer Y position.
 	
 	# a.) Ad-hockery: Set positionX so the entire tooltip widget will be displayed.
-	if  {[expr $positionX + $width] > [winfo screenwidth .]} {
-		set positionX [expr ($positionX - (($positionX + $width) - [winfo screenwidth .]))]
+	# Modified to handle horizontally-centred tooltips and left screen edge.
+	if  {[expr {$positionX + $width}] > [winfo screenwidth .]} {
+		set positionX [expr [winfo screenwidth .] - $width]
+	} elseif {$positionX < 0} {
+		set positionX 0
 	}
 	
 	wm geometry $tooltip [join  "$width x $height + $positionX + $positionY" {}]
