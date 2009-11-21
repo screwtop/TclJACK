@@ -34,12 +34,12 @@ proc new_advance_interval {} {
 		}
 	} else {
 		# We're continuing: increase the step size somewhat:
-		# Since this can also be used to step forward and back, round the time to the nearest x/y seconds, to avoid messing up the timecode with fractional parts of a second.  This has the nice side-effect that it can seek uniformly by seconds for the first few steps (provided we map any 0s to 1s).
 		set ::advance_interval [expr {$::advance_interval * 1.1}]
 	}
-	puts $::advance_interval
-	puts [expr round([anticlip $::advance_interval -1 1])]
-	return [expr round([anticlip $::advance_interval -0.5 0.5])]	;# Apply minimum step size
+
+	# Since this can also be used to move forward and back while transport is not running, round the time to the nearest x/y seconds, to avoid messing up the timecode with fractional parts of a second.  This has the nice side-effect that it can seek uniformly by seconds for the first few steps.
+	
+	return [expr round([anticlip $::advance_interval -1 1])]	;# Apply minimum step size (+/-1 is the smallest useful anticlip range because of the round()).
 }
 
 
