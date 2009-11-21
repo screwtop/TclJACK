@@ -8,7 +8,7 @@
 # TODO: handle user preference for timecode clock display format (i.e. remembering, not a whole custom format model implementation).
 
 
-set jack_timecode_string {00:00:00.000}
+set jack_timecode_string {  ?:??:??.???}
 
 proc set_timecode_visibility {enabled} {
 	if {$enabled} {

@@ -1,6 +1,6 @@
 # JACKManager control panel element for monitoring the sampling rate.
 
-set jack_sampling_rate_string {?}
+set jack_sampling_rate_string {     ? Hz}
 
 proc set_samplerate_visibility {enabled} {
 	if {$enabled} {

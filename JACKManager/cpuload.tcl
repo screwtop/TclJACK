@@ -1,6 +1,6 @@
 # JACKManager control panel element for monitoring the CPU DSP load percentage.
 
-set jack_cpu_load_string {?}
+set jack_cpu_load_string {  ?.?%}
 
 proc set_cpuload_visibility {enabled} {
 	if {$enabled} {
