@@ -40,6 +40,7 @@ source Preferences.tcl
 # proc every {ms body} {eval $body; after $ms [info level 0]}
 # Now using DKF's one, which returns an "every ID" so you can cancel them at will (needed for FFW/REW transport functionality).
 source every.tcl
+source anticlip.tcl	;# Used in transport.tcl
 
 source tooltips.tcl
 
