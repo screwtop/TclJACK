@@ -27,13 +27,14 @@ proc create_transport {} {
 	# If we're rolling, should hitting "|<" stop the transport or leave it rolling?
 	# TODO: have play and pause buttons change colour to indicate transport state.
 	# Alternative chars: ▪ ▸
+	# FFW, REW have no commands because they have separate press and release bindings (defined below).
 	set transport_buttons {
 		{start {|<} {Return to Start}          {jack transport locate 0}}
-		{rew   {<<} {Rewind}                   {puts rew}}
+		{rew   {<<} {Rewind}                   {}}
 		{stop  {[]} {Stop and Return to Start} {jack transport stop; jack transport locate 0}}
 		{play  { >} {Play}                     {jack transport start}}
 		{pause {||} {Pause/Stop}               {jack transport stop}}
-		{ffw   {>>} {Fast Forward}             {puts ffw}}
+		{ffw   {>>} {Fast Forward}             {}}
 	}
 
 	foreach button $transport_buttons {
@@ -45,6 +46,19 @@ proc create_transport {} {
 		setTooltip .transport.$name $tooltip
 		pack .transport.$name -side left
 	}
+
+	# REW and FFW buttons are special, in that they need to start responding on button down, and keep going while the button is held down.
+	# It may be worth considering having the others respond to press rather than release, as IIRC Ardour's transport buttons do.  This is for faster response, I presume.
+
+	# There seems to be a problem when using these (with Ardour 2.8.4 at least), that after a (variable) number of transport repositions, the transport stops rolling.  For now, we'll ask JACK to start the transport again after each step.  Of course, this would cause the transport to start using FFW/REW while the transport is stopped, which isn't correct behaviour.
+
+	# Will need separate bindings for press and release:
+
+	bind .transport.ffw <ButtonPress-1> {set ::ffw [every 100 {advance 1}]}
+	bind .transport.ffw <ButtonRelease-1> {every cancel $::ffw}
+	
+	bind .transport.rew <ButtonPress-1> {set ::rew [every 100 {advance -1}]}
+	bind .transport.rew <ButtonRelease-1> {every cancel $::rew}
 }
 
 proc destroy_transport {} {destroy .transport}
@@ -54,7 +68,15 @@ proc show_transport {} {grid .transport -row 0 -column 1}
 proc hide_transport {} {grid forget .transport}
 
 
-# REW and FFW buttons are special, in that they need to start responding on button down, and keep going while the button is held down.
-# It may be worth considering having the others respond to press rather than release, as IIRC Ardour's transport buttons do.  This is for faster response, I presume.
 
+
+
+# Support procedure for seeking forward or backward by a particular interval:
+# Use negative seconds to go back ("retreat"?).
+# Should this functionality be provided in TclJACK?
+proc advance {seconds} {
+	jack transport locate [expr {[jack timecode] + $seconds * [jack samplerate]}]
+}
+
+# Will need event control code as well: start ffwding on button press, stop (cancel) on button release.
 

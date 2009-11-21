@@ -37,8 +37,9 @@ source Preferences.tcl
 
 # Routine for timed execution of specific code (used in updating the timecode display, CPU load, etc.).
 # NOTE: If we use Jeff Hobbs's "every" package instead of the simple "every" proc below, we can start and stop these updating for efficiency (e.g. if not being displayed and if the information is otherwise not needed by this program).  NOTE: even if you destroy the component being updated with destroy_<component>, the [every] persists!  TODO: implement.
-
-proc every {ms body} {eval $body; after $ms [info level 0]}
+# proc every {ms body} {eval $body; after $ms [info level 0]}
+# Now using DKF's one, which returns an "every ID" so you can cancel them at will (needed for FFW/REW transport functionality).
+source every.tcl
 
 source tooltips.tcl
 
