@@ -24,12 +24,10 @@ proc advance {seconds} {
 # Support function defining how the FFW/REW seek step increases with number of steps taken.
 proc new_advance_interval {} {
 	if {![info exists ::advance_interval]} {
-		# Are we going forwards or backwards?
+		# Starting FFW/REW. Are we going forwards or backwards?  Initialise step size accordingly.
 		if {[info exists ::ffw]} {
-			puts "new FFW"
 			set ::advance_interval 0.5
 		} else {
-			puts "new REW"
 			set ::advance_interval -0.5
 		}
 	} else {
