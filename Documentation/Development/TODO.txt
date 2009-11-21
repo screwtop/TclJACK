@@ -4,6 +4,8 @@ tcljack.c
 [ ] Dynamic port allocation for n-channel metering.
 
 JACKManager:
+[ ] Have Pause button store the transport location so it can resume from there
+(Ardour workaround).
 [ ] A mechanism for starting and stopping the JACK server itself.
 	[ ] A JACK settings profiles management mechanism?
 [ ] Transport FFW and REW functionality.
