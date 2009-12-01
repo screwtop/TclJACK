@@ -1,0 +1,50 @@
+Possibly useful events for JACKManager and LexerDexer
+
+ButtonPress
+Configure, ConfigureRequest
+KeyPress, KeyRelease
+Property
+
+
+button .b -text {Hello} -command {puts hello}
+grid .b
+bind .b <Enter> {puts in}
+bind .b <Leave> {puts out}
+
+destroy .b
+
+destroy .e
+
+entry .e -textvariable search_string
+grid .e
+bind .e <KeyRelease> {puts [split $search_string {'-,.:; 	}]}	;# Better, but strip out empties and stop-words.
+# Note that it does get triggered by any keypress, and I guess not pastes.
+# Maybe it'd be better to base it on change events on $search_string, if that's possible.
+
+
+
+entry .e -textvariable search_string -width 80
+grid .e
+
+# A rough stab at extracting (English language) keywords from a (possibly sloppily-formed) string:
+proc string_to_keywords {search_string} {
+	set stopchars "'-.,:;!? 	\n\r"
+	set stopwords {a the am are of by is I you s m ve re}	;# Keep these minimal, eh - "you" could be an important keyword.  and, or, not?  Could be useful in forming boolean expressions.  Same with brackets for grouping.
+	# Stopchars can be removed in one line thanks to lsearch:
+	set keywords [lsearch -inline -exact -all -not [split $search_string $stopchars] {}]
+	# Removing the stopwords must be done one at a time, however:
+	foreach stopword $stopwords {
+		set keywords [lsearch -inline -exact -all -not $keywords  $stopword]
+	}
+	# Could consider converting to lowercase as well.  Case-sensitivity is going to be a tough one to decide on.
+	return $keywords
+}
+
+bind . <KeyRelease> {puts [string_to_keywords $search_string]}
+
+
+# Basic dialog:
+toplevel .about
+message .about.message -text {Lorem ispum dolor sit ament and stuff and thing and whatevers you knows and so on etcetera et alia inter alia pro bono.}
+
+

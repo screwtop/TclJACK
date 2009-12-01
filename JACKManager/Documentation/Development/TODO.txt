@@ -1,0 +1,13 @@
+
+# TODO: monospaced font for transport button glyphs and time display.
+#font create font_mono -family fixed -size 6
+#font create font_mono -family lucy -size 8
+#font create font_mono -family lucidatypewriter -size -19
+#font create font_sans -family Helvetica -size -12
+#font create font_sans -family cure -size -10	;# About as small as it gets.
+#option add *font font_sans
+
+TODO: fix jackmanager.tcl segfault when fed very loud audio!  Probably a libtcljack problem.  It wasn't the meter drawing (I clipped it to 0..1).
+
+TODO: a warning when approaching JACK's transport frame wraparound point.
+
