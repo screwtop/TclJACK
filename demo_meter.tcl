@@ -43,7 +43,7 @@ proc every {ms body} {eval $body; after $ms [info level 0]}
 
 #set nmax 10
 #every 50 {sound_gauge_update [jack meter -rms]}; if {[incr ::nmax -1]<=0} return}
-every 50 {sound_gauge_update [lindex [jack meter] 1]}
+every 50 {sound_gauge_update [lindex [jack meter] 1]; puts [jack meter]}
 #every 50 {sound_gauge_update [jack meter]}; if {[incr ::nmax -1]<=0} return}
 # Hmm, that seems to keep going indefinitely instead of stopping after 10 reps.
 

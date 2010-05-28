@@ -27,12 +27,15 @@
 #wm withdraw .	;# Hide the window initially, until everything is set up
 
 set application_name {JACKManager}
+set about_text "JACKManager, a Tcl/Tk-based control panel for the JACK Audio Connection Kit\n©2009, 2010 Chris Edwards"
+
 wm title . $application_name
 
 # Temporarily remove the window from being managed by the WM, so that the initial window geometry will be unaffected by the window manager (e.g. Ion).
 wm overrideredirect . 1
 #wm transient .
 
+# TODO: move standard location to ~/.jackmanager/Preferences.tcl or somewhere.  Maybe have a split system/user preferences scheme.
 source Preferences.tcl
 
 # Routine for timed execution of specific code (used in updating the timecode display, CPU load, etc.).
@@ -45,8 +48,14 @@ source anticlip.tcl	;# Used in transport.tcl
 source tooltips.tcl
 
 
+puts $about_text
+puts "\nRunning on Tcl/Tk version [info tclversion]"
+
+
 # Might as well actually connect to JACK, since we can...
-load ../libtcljack.so
+# TODO: implement a proper Tcl package wrapper for the binary, and change this to use [package require].
+#load ../libtcljack.so
+package require TclJACK
 jack register
 
 # Hmm, should probably define in one place what the external and internal names for the various components should be:

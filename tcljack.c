@@ -19,6 +19,7 @@
  * Learn about argument handling, and implement for [jack meter -peak -rms -trough -db].
  * Investigate event handling: how does a Tcl extension declare and generate an event?  Or handle a Tcl event?  Or are these only relevant in Tk, which has an event loop?
  * Determine whether signal handling is useful or necessary for this library.
+ * Add a command for checking whether we're registered with the JACK server.
  * Implement wrappers for the following:
  * jack_set_sample_rate_callback (to avoid needlessly querying for this; could simply update static variable in this, and/or (perhaps better) trigger a Tcl event)
  * jack_set_buffer_size_callback (similar to above)
@@ -265,9 +266,11 @@ Tcljack_Cpuload(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *arg
 }
 
 
-// This function provides a single command for level metering, to ensure that we use the same measurement window for all measurements.  Returning a tuple, essentially (as a Tcl list, I guess).
+// This function provides a single command for polled level metering, to ensure that we use the same measurement window for all measurements.  Returning a tuple, essentially (as a Tcl list, I guess).
+// It would be nice to have an alternative push-style means of returning metering information to Tcl.  Perhaps a Tcl I/O channel would be the way to do this.
 // TODO: handle args for different measurements.  Peak, trough, and RMS are recorded by process_jack_buffer(); here we just have to output them.
 // TODO: could perhaps optionally do conversion to dB (either numeric or AES-17 dB FS), Stevens RMS loudness, etc. as well.  That stuff isn't happening at the audio data rate, so delegating to the Tcl layer shouldn't be a performance problem.
+// TODO: possibly also have a flag for whether metering should be done or not (with the process function adapting accordingly).
 // Would be better I think to pass the floats as objects and not have to worry about string formatting here.  TODO: investigate.
 static int
 //Tcljack_Meter(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])

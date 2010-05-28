@@ -2,16 +2,38 @@
 # Obviously, this should all propery be stored in a database somewhere, eventually!
 # NOTE: see also ~/.Xdefaults (Tk honours this file).  
 
+# TODO: figure out differences in font metrics or whatever between Tk 8.4 and 8.5 (things appear much bigger in 8.5 for some reason).
+
 # What sort of font settings?  Mono/Sans/Serif?  Or maybe more specific function-based ones, depending on where it'll appear?  Bold in places?
 # Font stuff across Tk verssions could get complicated (8.5 supports TrueType and antialiasing).
 
+# New attempt using namespace for global preference-oriented variables:
+namespace eval ::tcljack {
+	set font_mono_face {LucidaTypewriter}
+	set font_mono_size -10
+	set font_mono "$font_mono_face $font_mono_size"
+#	puts [font metrics $font_mono]
+	# Actually, maybe I should be using (or rather deriving from) "-font TkFixedFont" instead...
+	# set font_string_mono {TkFixedFont}
+
+#	set font_string_sans {Helvetica 12}
+
+	font create font_mono -family $font_mono_face -size $font_mono_size
+}
+
+#font create font_mono -family LucidaTypewriter -size -12
+
 #{-*-cure-*-*-*-*-11-*-*-*-*-*-*-*}	;# Tiny!
-#set font_mono  {}
+#set font_mono  {Letter Gothic 12 Pitch}
+#set ::tcljack::font_mono {LucidaTypewriter 8}
 # Letter Gothic 12 Pitch, Lucida Sans Typewriter, LucidaTypewriter, Orator, Prestige
 #font create font_mono -family lucidatypewriter -size -12
-font create font_mono -family fixed -size 6
+# "fixed" should be available on any X11 installation, right?
+# -size 6 was about right for Tk 8.4, but too big on 8.6 
+#font create font_mono -family fixed -size -50
 
 #set font_sans  {-*-helvetica-medium-r-*-*-11-*-*-*-*-*-*-*}
+#font create font_sans -family TradeGothic -size -14
 font create font_sans -family Helvetica -size -12	;# -size is in what units?  Ah, if negative, pixels.
 #font create font_sans -family cure -size -10	;# About as small as it gets.
 #{-*-helvetica-bold-r-*-*-11-*-*-*-*-*-*-*}
@@ -31,7 +53,7 @@ set statusbar_foreground_colour {#a0a0a0}
 . configure -background $statusbar_background_colour
 
 option add *TearOff 1
-option add *font font_sans
+option add *font font_sans	;# Actually, maybe better to respect the user's general font preferences.
 
 
 # Tone down the bevelling a little (hard to tell which of these do anything much, although the hand2 thing works):
