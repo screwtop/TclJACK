@@ -1,0 +1,31 @@
+JACKManager To-Do List:
+(Oh, do I have one of these already in the top-level TclJACK docs folder?)
+
+
+[ ] Figure out how to get Ion's systray layout to refresh when adding (and I guess removing) components.
+
+[ ] Get the components to go back in the same order when showing/hiding!  Might have to switch to grid layout?
+
+[ ] Merge in existing stuff from the DeskNerd JACK component (I think it belongs here more) in working towards the proper version of this.
+
+[ ] Add an xrun counter or alert; perhaps another menubutton, showing the total xrun count, with popup menu items showing the log of recent xruns.  The button could flash red whenever an xrun occurs to alert the user.
+
+[ ] Figure out why (on Marvin, anyway) suspending JACKManager causes mplayer to die a horrible death.
+
+[ ] option (perhaps menu command) to float the window (wm overrideredirect styles), and another to allow docking in systray.
+
+[ ] When floating, prevent the entire window from going offscreen (can happen if you remove components near the edge of the screen.
+
+[ ] Investigate dock/systray protocols for WMs other than Ion3.
+
+[ ] Monospaced font for transport button glyphs and time display.
+#font create font_mono -family fixed -size 6
+#font create font_mono -family lucy -size 8
+#font create font_mono -family lucidatypewriter -size -19
+#font create font_sans -family Helvetica -size -12
+#font create font_sans -family cure -size -10   ;# About as small as it gets.
+#option add *font font_sans
+
+[ ] Fix jackmanager.tcl segfault when fed very loud audio!  Probably a libtcljack problem.  It wasn't the meter drawing (I clipped it to 0..1).
+
+[ ] A warning when approaching JACK's transport frame wraparound point.
