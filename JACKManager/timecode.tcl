@@ -21,7 +21,7 @@ proc set_timecode_visibility {enabled} {
 
 proc create_timecode {} {
 	# Can we set a format property to control how the textvariable is displayed?
-	menubutton .timecode  -textvariable jack_timecode_string  -menu .timecode.menu  -font font_mono  -relief flat -cursor {arrow}
+	menubutton .timecode  -textvariable jack_timecode_string  -menu .timecode.menu  -font $::tcljack::font_mono  -relief flat -cursor {arrow}
 	setTooltip .timecode {JACK transport timecode}
 
 	# Set up its context menu:
@@ -33,7 +33,7 @@ proc create_timecode {} {
 	#	.timecode.menu add separator
 
 	# Lastly, start its updates running:
-	every 50 {set ::jack_timecode_string [frames_to_hhmmss [jack timecode] [jack samplerate]]}	;# "hhh:mm:ss.mss"
+	every 16 {set ::jack_timecode_string [frames_to_hhmmss [jack timecode] [jack samplerate]]}	;# "hhh:mm:ss.mss"
 #	every 50 {set ::jack_timecode_string [jack timecode]}	;# For raw frames
 }
 

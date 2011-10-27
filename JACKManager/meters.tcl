@@ -1,11 +1,24 @@
 # Built-in audio meters for JACKManager.  How many?  Currently, the input ports in TclJACK are hard-coded (at 1!).
+# TODO: set the height of the meter appropriately, perhaps using font metrics.
+# TODO: some way of adding/removing meters
+# TODO: some way of connecting a meter to an audio source.  Will require functionality being added to TclJACK library first!
+
 
 namespace eval ::meters {}
 
 
-# TODO: declare these variables the correct way (namespaces?).
-set ::meters::meter_width 6
-set ::meters::meter_height 21
+# Some dimensions and meter settings:
+#set ::meters::meter_height 23
+set ::meters::meter_height [expr {[dict get [font metrics $::tcljack::font_mono] -linespace] + 10}]
+#puts $::meters::meter_height
+set ::meters::meter_width [expr {$::meters::meter_height / 4}]
+# Meter height working:
+# size: -12:	-ascent 11 -descent 2 -linespace 13 -fixed 1	meter_height: 23
+# size: -10:	-ascent 9 -descent 2 -linespace 11 -fixed 1	meter_height: 21
+# size:  -8:	-ascent 8 -descent 2 -linespace 10 -fixed 1	meter_height: 20
+
+
+
 set ::meters::meter_clipping_threshold [expr {1 - 1 / pow(2,15)}]	;# 1 bit below full-scale for 16-bit precision.  This could probably be global.
 
 
@@ -29,6 +42,7 @@ proc create_meters {} {
 #	global meter_width meter_height
 	# There's just one meter at the moment.
 	namespace eval ::meters::meter0 {}
+	namespace eval ::meters::meter1 {}
 
 	# Probably want a frame around the whole meter set, as we don't know how many we'll have.
 	frame .meters -borderwidth 1
@@ -41,6 +55,7 @@ proc create_meters {} {
 	setTooltip .meters {Audio signal level(s)}
 
 	# Start the meter updating in the background:
+	# TODO: properly figure out how often to update.  Every 16 ms might be reasonable assuming a 60 Hz display refresh rate.  Or, we could try to update when the JACK process() happens...might be more often than necessary?  
 	set ::meters::meter0::updater [every 50 {
 		global meter_width meter_height meter_clipping_point
 

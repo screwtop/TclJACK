@@ -1,0 +1,15 @@
+Switched to using [pack forget] instead of [destroy] for hiding components!
+
+Hmm, how to make the show/hide thing work?  [pack forget] doesn't reclaim the space used by the widget, it just leaves a big gap.  Can you repack the parent or something?
+
+Empty frames are not an ideal solution either, as they occupy one pixel on the screen that I can't seem to get rid of.
+
+Maybe my first strategy of destroying and re-creating the components wasn't so bad after all.
+
+There are also issues with Ion's systray: the initial size is OK, but resizing the window due to toggling components doesn't trigger a re-resize, and it just draws over the rest of the statusbar.
+
+I think grid layout is going to be the way to go.  Sizing is still dynamic, but you can put things where they belong.
+
+--
+
+Realistically, we can probably do away with many of the procs in the per-component scripts.  We only ever create them once, and we don't care about destroying.  Show and hide are probably only ever called from the set_visibility proc, but they may be worth keeping in case you need to set them to a specific state.

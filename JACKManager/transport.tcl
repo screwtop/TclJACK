@@ -73,7 +73,9 @@ proc create_transport {} {
 		set caption [lindex $button 1]
 		set tooltip [lindex $button 2]
 		set command [lindex $button 3]
-		button .transport.$name -text $caption -command $command -font font_mono -padx 2m -pady 1m -cursor hand1
+	#	button .transport.$name -text $caption -command $command -font font_mono -padx 2m -pady 1m -cursor hand1
+		# TODO: maybe use font metrics rather than 1m for the padding here:
+		button .transport.$name -text $caption -command $command -font $::tcljack::font_mono -padx 1m -pady 1m -cursor hand1
 		setTooltip .transport.$name $tooltip
 		pack .transport.$name -side left
 	}

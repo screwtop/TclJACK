@@ -16,6 +16,7 @@
  * Learn about option/argument handling, and implement for [jack meter -peak -rms -trough -db].
  * Investigate event handling: how does a Tcl extension declare and generate an event?  Or handle a Tcl event?  Or are these only relevant in Tk, which has an event loop?  Ah, see Tcl_CreateEventSource(), and http://wiki.tcl.tk/17195.
  * Determine whether signal handling is useful or necessary for this library.
+ * Add a command for checking whether we're registered with the JACK server.
  * Implement wrappers for the following:
  * jack_set_sample_rate_callback (to avoid needlessly querying for this; could simply update static variable in this, and/or (perhaps better) trigger a Tcl event)
  * jack_set_buffer_size_callback (similar to above)
@@ -62,6 +63,8 @@ static bool registered = false;
 jack_port_t *input_port;
 // jack_port_t *input_port_left;
 // jack_port_t *input_port_right;
+jack_port_t *midi_input_port;
+
 // Do we need to declare these as volatile or something?
 static float buffer_peak = 0.0;
 static float buffer_trough = 0.0;
@@ -84,6 +87,7 @@ static float periodic_dc_offset = 0.0;
 static float periodic_rms_sum_of_squares = 0.0;
 // Perhaps also a convenience boolean to indicate presence of a signal on the input port (or, TODO, ports).
 static bool signal_present = false;
+static jack_nframes_t midi_event_count = 0;	// Maintain a count of MIDI events since it was last queried (for use as/in a simple MIDI activity monitor).
 
 
 // Program info and usage:
@@ -92,7 +96,7 @@ static bool signal_present = false;
 static const char* tcljack_version = "0.1";
 
 // + version, usage, 
-static char usage_string[] = "Usage forms:"
+static char usage_string[] = "TclJACK (JACK audio server interface for Tcl)\nUsage forms:"
 	"\n	jack register"
 	"\n	jack deregister"
 	"\n	jack transport"
@@ -229,14 +233,17 @@ Tcljack_Register(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *ar
 
 	// Buffer size notification callback function registration:
 	jack_set_buffer_size_callback(client, buffer_size_callback, 0);
+	// Apparently some JACK implementations don't call that callback when a client first registers/connects/opens, so we'll query it voluntarily here:
+	buffer_size = jack_get_buffer_size(client);
+	// TODO: find out whether doing the same for the sampling frequency might be necessary.
 
 	// Client connection/disconnection callback registration:
 	jack_set_client_registration_callback(client, client_registration_callback, 0);
 
 	// TODO: port registration and connection/disconnection callbacks:
-	// int jack_set_port_registration_callback 
-	// int jack_set_port_connect_callback 
-	// int jack_set_xrun_callback 
+	// int jack_set_port_registration_callback
+	// int jack_set_port_connect_callback
+	// int jack_set_xrun_callback
 
 	// On-shutdown callback; applicable?
 //	jack_on_shutdown(client, jack_shutdown, 0);
@@ -245,16 +252,26 @@ Tcljack_Register(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *ar
 	input_port = jack_port_register(client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
 	if ((input_port == NULL)) {	// || (input_port_right == NULL)
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: Unable to register input port with server!", -1));
-		return TCL_ERROR; 
+		return TCL_ERROR;
 	}
 
-	// Don't forget to activate this client:
+	// We'll also open a MIDI port for simple MIDI activity monitoring (maintaning a cumulative count of events)
+	midi_input_port = jack_port_register(client, "midi_input", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
+	if ((midi_input_port == NULL)) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: Unable to register MIDI input port with server!", -1));
+		return TCL_ERROR;
+	}
+	midi_event_count = 0;
+	// TODO: automatically connect to all available MIDI capture ports?
+
+
+	// Lastly, don't forget to activate this client:
 	if (jack_activate(client)) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: Unable to activate client!", -1));
-		return TCL_ERROR; 
+		return TCL_ERROR;
 	}
 
-	// Maybe this should return "1", "OK", the name of the server or client, or something.  Then again, perhaps nothing is fine.
+	// Maybe this should return "1", "OK", the name of the server or client, or something.  Perhaps a concatenation of the two.  Then again, perhaps nothing is fine.
 	//Tcl_SetObjResult(interp, Tcl_NewStringObj(??server name?? | 1 | whatevs, -1));
 	//interp->result = "1";
 	return TCL_OK;
@@ -262,6 +279,7 @@ Tcljack_Register(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *ar
 
 // Deregister this client from JACK server:
 // What's the better way to handle it: only try closing if registered, or return a Tcl error if deregistering when noc registered?
+// TODO: do we need to free() any JACK resources here as well before closing?  Just because we're deregistering doesn't mean the Tcl process is going away.
 static int
 Tcljack_Deregister(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
@@ -310,6 +328,7 @@ Tcljack_Samplerate(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CO
 
 
 // Report the JACK buffer size:
+// Hmm, oddly, on JACK 1.9.6 at work, the buffer size callback doesn't get called when we register (the sampling frequency does, though), so this ends up reporting 0 initially.  I know - query it in Tcljack_Register().
 static int
 Tcljack_Buffersize(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
 {
@@ -347,6 +366,7 @@ Tcljack_Timecode(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONS
 // Retrieve the server's current CPU DSP load:
 // TODO: switch to Tcl object interface?
 // This should probably pass a value with as much precision as received; rounding can be done further up if required.
+// Maybe we should also divide by 100% to return numbers normalised to 0..1.
 static int
 Tcljack_Cpuload(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
@@ -356,7 +376,7 @@ Tcljack_Cpuload(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *arg
 	CHECK_JACK_REGISTRATION_STATUS;
 
 	// Find and return sampling rate:
-	cpu_load = jack_cpu_load(client);	// NOTE: this has already been multiplied by 100%!
+	cpu_load = jack_cpu_load(client);	// NOTE: the value received from JACK has already been multiplied by 100%!
 	sprintf(output_buffer, "%3.10f", cpu_load);	// Pad with spaces to the left?  1 DP?  Is the returned value in % or not?
 	Tcl_SetResult(interp, output_buffer, TCL_VOLATILE);
 
@@ -364,9 +384,11 @@ Tcljack_Cpuload(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *arg
 }
 
 
-// This function provides a single command for level metering, to ensure that we use the same measurement window for all measurements.  Returning a tuple, essentially (as a Tcl list, I guess).
+// This function provides a single command for polled level metering, to ensure that we use the same measurement window for all measurements.  Returning a tuple, essentially (as a Tcl list, I guess).
+// It would be nice to have an alternative push-style means of returning metering information to Tcl.  Perhaps a Tcl I/O channel would be the way to do this.
 // TODO: handle args for different measurements.  Peak, trough, and RMS are recorded by process_jack_buffer(); here we just have to output them.
 // TODO: could perhaps optionally do conversion to dB (either numeric or AES-17 dB FS), Stevens RMS loudness, etc. as well.  That stuff isn't happening at the audio data rate, so delegating to the Tcl layer shouldn't be a performance problem.
+// TODO: possibly also have a flag for whether metering should be done or not (with the process function adapting accordingly).
 // Would be better I think to pass the floats as objects and not have to worry about string formatting here.  TODO: investigate.
 static int
 //Tcljack_Meter(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
@@ -515,6 +537,18 @@ Tcljack_Ports(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[
 
 
 
+// Return the number of MIDI events received (since we last checked, or since we registered.)
+static int
+Tcljack_Midieventcount(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
+{
+	CHECK_JACK_REGISTRATION_STATUS;
+	Tcl_SetObjResult(interp, Tcl_NewIntObj(midi_event_count));
+	midi_event_count = 0;
+	return TCL_OK;
+}
+
+
+
 
 // Various callback functions internal to TclJACK follow:
 
@@ -544,19 +578,23 @@ client_registration_callback(const char* client_name, int registering, void *arg
 }
 
 
+// TODO: callbacks for port registration, port-to-port connection/disconnection events.
+
+
+
 // For monitoring, we'll need to set up a port (or two, or n) to receive audio, and define a JACK process() callback fuction.  We've called it process_jack_buffer.
 // This will have level metering capability, calculating statistics over the current JACK sample buffer, and copying the results into the relevant global variables from which they can be read asynchronously from Tcl.
 int
 process_jack_buffer(jack_nframes_t nframes, void *arg)
 {
-	jack_default_audio_sample_t *input;
+	jack_default_audio_sample_t *input, *midi_input_buffer;
 //	jack_default_audio_sample_t *in_right;
 	unsigned int i;		// For for-loop index.
-	jack_default_audio_sample_t max_sample = 0.0;		// For peak (largest encountered) value
-	jack_default_audio_sample_t min_sample = 1.0;	// For trough (smallest non-zero) value
-	jack_default_audio_sample_t rms_sum_of_squares = 0.0;	// For RMS level
-	jack_default_audio_sample_t offset_sum = 0.0;	// for DC offset measurement
-	
+	jack_default_audio_sample_t max_sample = 0.0;           // For peak (largest encountered) value
+	jack_default_audio_sample_t min_sample = 1.0;           // For trough (smallest non-zero) value
+	jack_default_audio_sample_t rms_sum_of_squares = 0.0;   // For RMS level
+	jack_default_audio_sample_t offset_sum = 0.0;           // for DC offset measurement
+
 	input = jack_port_get_buffer (input_port, nframes);
 	for (i = 0; i < nframes; i++)
 	{
@@ -581,6 +619,11 @@ process_jack_buffer(jack_nframes_t nframes, void *arg)
 	buffer_trough = min_sample;
 	buffer_rms = sqrt(rms_sum_of_squares / nframes);
 	buffer_dc_offset = offset_sum / nframes;	// Integer division? Do not want!
+
+
+	// And for the MIDI monitor input port:
+	midi_input_buffer = jack_port_get_buffer(midi_input_port, nframes);
+	midi_event_count += jack_midi_get_event_count(midi_input_buffer);
 
 	return 0;
 }
@@ -623,6 +666,8 @@ Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 		return Tcljack_Transport(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "ports") == 0)
 		return Tcljack_Ports(cdata, interp, 0, NULL);
+	else if (strcmp(argv[1], "midieventcount") == 0)
+		return Tcljack_Midieventcount(cdata, interp, 0, NULL);
 	else
 	{
 		Tcl_SetResult(interp, usage_string, TCL_STATIC);
@@ -649,7 +694,7 @@ Tcljack_Init(Tcl_Interp *interp)
 	}
 
 	// Good to go...
-	
+
 	// Main command is "jack", with subcommands identified and handled by Tcljack_Dispatcher():
 	Tcl_CreateCommand(interp, "jack", Tcljack_Dispatcher, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 
@@ -662,7 +707,7 @@ Tcljack_Init(Tcl_Interp *interp)
 
 //	Tcl_CreateCommand(interp, "jack_peak", Tcljack_Peak, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 	Tcl_CreateCommand(interp, "jack_meter", Tcljack_Meter, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
- 
+
 	return TCL_OK;
 }
 
