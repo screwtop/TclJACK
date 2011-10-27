@@ -1,12 +1,7 @@
-#include <tcl.h>
-//#include <string.h>?
-#include <math.h>
-#include <stdbool.h>
-#include <jack/jack.h>
-
-
 // This is the main implementation of TclJACK, my attempt at a Tcl extension for interacting with a JACK audio server via libjack.
-// General overview:
+
+
+// General overview of how to use it within Tcl:
 // % load ./libtcljack.so
 // jack_register -> Tcljack_Register()
 // [port connection handling is outside this program's control; you can do it with the jack_connect command or qjackctl.  However, this interface should provide a wrapper for the JACK connect function (whatever it's called).]
@@ -14,37 +9,56 @@
 // jack_deregister -> Tcljack_Deregister()
 
 
+
 /* TODO:
+ * Fix apparent memory leak in Tcljack_Ports()!  Also, have it return a proper list (to handle port names containing spaces).
  * Figure out how to handle disconnections from JACK properly.
- * Learn about argument handling, and implement for [jack meter -peak -rms -trough -db].
- * Investigate event handling: how does a Tcl extension declare and generate an event?  Or handle a Tcl event?  Or are these only relevant in Tk, which has an event loop?
+ * Learn about option/argument handling, and implement for [jack meter -peak -rms -trough -db].
+ * Investigate event handling: how does a Tcl extension declare and generate an event?  Or handle a Tcl event?  Or are these only relevant in Tk, which has an event loop?  Ah, see Tcl_CreateEventSource(), and http://wiki.tcl.tk/17195.
  * Determine whether signal handling is useful or necessary for this library.
  * Implement wrappers for the following:
  * jack_set_sample_rate_callback (to avoid needlessly querying for this; could simply update static variable in this, and/or (perhaps better) trigger a Tcl event)
  * jack_set_buffer_size_callback (similar to above)
  * jack_set_xrun_callback (for xrun reporting; ideally would trigger Tcl event to continue with push/event data flow style)
  * jack_on_shutdown (correct way to handle disconnection)
+ * jack_on_error (similarly)
+
+ * Various JACK port handling things: getting list of clients and their ports, connecting and disconnecting:
+ * jack_set_client_registration_callback
+ * jack_set_port_registration_callback
+ * jack_set_port_connect_callback (in case connections were made behind our back; also handles disconnections)
+	We probably want to be able to return to Tcl a list of ports, perhaps filtered by type.  Each port has relevant properties we might want to know/filter on/sort on as well.  We don't really want to have to implement a whole relational model and query language, though...pity I don't have one lying around I can just use...
+
  */
 
 
-// Note the naming: Tcljack_Xxx, not TclJACK_Xxx, which didn't seem to work ("couldn't find procedure Tcljack_init").
+
+#include <tcl.h>
+//#include <string.h>?
+#include <math.h>
+#include <stdbool.h>
+#include <stdlib.h>	// for free()
+#include <jack/jack.h>
+
 
 
 // Hmm, we're gonna need some global variables for holding various items of state, huh?
-static int counter = 0;
+static int counter = 0;	// This was just for testing
 static jack_client_t *client;	// That's us!
 static jack_status_t status;
 static jack_options_t options = JackNoStartServer;
-static const char *client_name = "tcljack";	// The JACK name for this client.  Could be auto-modified by JACK during registering to avoid dups.  "tcljack" or "TclJACK"?  Most other JACK clients use all lowercase.
+static jack_nframes_t sampling_frequency;	// (or "sample_rate" or "sampling_rate" or "jack_samplerate"?) in Hz.
+static jack_nframes_t buffer_size;	// The current/last-reported JACK buffer size.  Could change dynamically while connected!  Use callback to stay abreast.
+static const char *client_name = "tcljack";	// The (preferred) JACK name for this client.  Could be auto-modified by JACK during registering to avoid dups.  "tcljack" or "TclJACK"?  Most other JACK clients use all lowercase.
 static char *server_name = NULL;	// NULL -> not picky.
 // TODO: maybe also a registered flag, to make it less likely that we'll do something crashworthy like deregistering when we aren't registered.  Of course, we could still get booted without knowing about it...although maybe you can register a callback function with JACK for disconnection and other events.
 // http://jackaudio.org/files/docs/html/group__ClientCallbacks.html
 // http://jackaudio.org/files/docs/html/group__ErrorOutput.html
 static bool registered = false;
-// I guess if we used those callbacks appropriately, we could also maintain state such as the sampling rate etc. rather than querying for it every time.
 
 // For built-in level metering, we'll need some global variables for storing peak, trough and RMS values for the current buffer.
 // ...and of course the ports themselves!  Naming: input_port, meter_port or monitor_port?
+// TODO: maintain an array of input ports and allow for creating/destroying them dynamically via Tcl commands.
 jack_port_t *input_port;
 // jack_port_t *input_port_left;
 // jack_port_t *input_port_right;
@@ -70,8 +84,7 @@ static float periodic_dc_offset = 0.0;
 static float periodic_rms_sum_of_squares = 0.0;
 // Perhaps also a convenience boolean to indicate presence of a signal on the input port (or, TODO, ports).
 static bool signal_present = false;
-// We _could_ store the sampling rate here and use the JACK callback to update it, but it's probably not worth bothering.
-// static jack_nframes_t jack_samplerate;
+
 
 // Program info and usage:
 //static const unsigned int tcljack_version_major = 0;
@@ -86,8 +99,13 @@ static char usage_string[] = "Usage forms:"
 	"\n	jack timecode"
 	"\n	jack meter"
 	"\n	jack samplerate"
+	"\n	jack buffersize [frames]"
 	"\n	jack cpuload"
-//	"	jack info ()\n"
+	"\n	jack servername"
+	"\n	jack clientname"
+	"\n	jack info"
+	"\n	jack version"
+	"\n	jack ports"
 //	"	jack meter -peak -rms -trough\n"
 ;
 
@@ -97,7 +115,7 @@ static char usage_string[] = "Usage forms:"
 
 // A separate function for checking whether we are currently registered to a JACK server and aborting if not.
 // Actually, since this will have to set up a return value, it might have to be a preprocessor macro.
-#define CHECK_JACK_REGISTRATION_STATUS if (!registered) {interp->result = NOT_REGISTERED_ERROR_STRING; return TCL_ERROR; }
+#define CHECK_JACK_REGISTRATION_STATUS if (!registered) {Tcl_SetObjResult(interp, Tcl_NewStringObj(NOT_REGISTERED_ERROR_STRING, -1)); return TCL_ERROR; }
 
 
 
@@ -105,11 +123,21 @@ static char usage_string[] = "Usage forms:"
 // Now we come to some actual functionality.  There are a few test functions (procedures?) lying around here still.
 
 
-// Forward/stub/whatever declarations:
+// Forward stub declarations for our callback implementations:
 int process_jack_buffer(jack_nframes_t nframes, void *arg);
+int sample_rate_callback(jack_nframes_t frames_per_second, void *arg);	// or set_sample_rate_callback()?
+int buffer_size_callback(jack_nframes_t buffer_size_arg, void *arg);
+void client_registration_callback(const char* name, int registering, void *arg);
+// TODO: port_registration_callback
+// TODO: port_connection_callback
 
 
-// Just a dummy "hello world" routine:
+
+
+// Note the naming of the command procedures: Tcljack_Xxx, not TclJACK_Xxx, which didn't seem to work ("couldn't find procedure Tcljack_init").
+
+
+// Just a dummy "hello world" routine for testing:
 // TODO: turn this into a "version" command, perhaps (reporting libjack's or TclJACK's version?).
 static int
 Tcljack_Hello(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
@@ -121,15 +149,53 @@ Tcljack_Hello(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST o
 
 
 
-// Test of global variable and returning an integer via the object interface:
+// More testing: this extension maintains a global variable and this function returns its value as an integer via the object interface:
 static int
 Tcljack_Counter(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
 {
 	Tcl_Obj *result_pointer;
 
 	counter++;
-	result_pointer = Tcl_GetObjResult(interp);	
+	result_pointer = Tcl_GetObjResult(interp);
 	Tcl_SetIntObj(result_pointer, counter);
+
+	// Can that just be simplified to the following?:
+//	Tcl_SetObjResult(interp, Tcl_NewIntObj(++counter));
+	return TCL_OK;
+}
+
+
+
+// Uh, does this return the version of the JACK server, or the library we're linked with?  I have a feeling it's the latter.
+// TODO: separate commands for the name of the current server (if registered), version of TclJACK, etc.
+static int
+Tcljack_Version(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
+{
+	Tcl_Obj *result_pointer = Tcl_GetObjResult(interp);
+	// AFAICT, jack_get_version_string() is for the libjack version, not the jackd we're connected to, so the following is not necessary:
+//	CHECK_JACK_REGISTRATION_STATUS;
+	Tcl_AppendStringsToObj(result_pointer, jack_get_version_string(), NULL);
+
+/*
+	// First attempt using jack_get_version() instead:
+	// Hmm, this just gives 0.0.0.0.  Ah, apparently it's not really implemented; try jack_get_version_string() instead!
+	int major, minor, micro, proto;
+	jack_get_version(&major, &minor, &micro, &proto);
+	Tcl_Obj *resultPtr = Tcl_GetObjResult(interp);
+
+//	Tcl_AppendStringsToObj(resultPtr, "v", "[ersion]", NULL);
+	Tcl_AppendObjToObj(resultPtr, Tcl_NewIntObj(major));
+	Tcl_AppendStringsToObj(resultPtr, ".", NULL);
+	Tcl_AppendObjToObj(resultPtr, Tcl_NewIntObj(minor));
+	Tcl_AppendStringsToObj(resultPtr, ".", NULL);
+	Tcl_AppendObjToObj(resultPtr, Tcl_NewIntObj(micro));
+	Tcl_AppendStringsToObj(resultPtr, ".", NULL);
+	Tcl_AppendObjToObj(resultPtr, Tcl_NewIntObj(proto));
+	Tcl_AppendStringsToObj(resultPtr, NULL);
+	Tcl_SetObjResult(interp, resultPtr);
+*/
+
+	Tcl_SetObjResult(interp, result_pointer);
 	return TCL_OK;
 }
 
@@ -139,24 +205,38 @@ Tcljack_Counter(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST
 static int
 Tcljack_Register(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
-	// Crashes can occur if you try to register when you are already registered.
+	// NOTE: Crashes can occur if you try to register when you are already registered.
 	// If already registered, should we raise a Tcl error, or just disconnect and reconnect?
 	if (registered) {jack_client_close(client);}
 
 	client = jack_client_open(client_name, options, &status, server_name);
-	if (client == NULL) { interp->result = "Error connecting to JACK server."; registered = false; return TCL_ERROR; }
+	if (client == NULL) { Tcl_SetObjResult(interp, Tcl_NewStringObj("Error connecting to JACK server.", -1)); registered = false; return TCL_ERROR; }
 	registered = true;
 
 	// Check if we got assigned a different client name (and update our idea of it, if so).
 	if (status & JackNameNotUnique)
 	{
-		client_name = jack_get_client_name(client);	// Is this going to work OK with it being a const char*?
-		// Can we use stderr in a Tcl extension?
-	//	fprintf (stderr, "unique name `%s' assigned\n", client_name);
+		client_name = jack_get_client_name(client);	// Is this going to work OK with it being a const char*?  Memory management?!
+		// Can we use stderr in a Tcl extension?  A: yep.
+		fprintf (stderr, "tcljack: registered as client name \"%s\" \n", client_name);
 	}
 
 	// Tell the JACK server what our process() function is:
 	jack_set_process_callback(client, process_jack_buffer, 0);
+
+	// Sampling frequency notification callback function registration:
+	jack_set_sample_rate_callback(client, sample_rate_callback, 0);
+
+	// Buffer size notification callback function registration:
+	jack_set_buffer_size_callback(client, buffer_size_callback, 0);
+
+	// Client connection/disconnection callback registration:
+	jack_set_client_registration_callback(client, client_registration_callback, 0);
+
+	// TODO: port registration and connection/disconnection callbacks:
+	// int jack_set_port_registration_callback 
+	// int jack_set_port_connect_callback 
+	// int jack_set_xrun_callback 
 
 	// On-shutdown callback; applicable?
 //	jack_on_shutdown(client, jack_shutdown, 0);
@@ -164,17 +244,18 @@ Tcljack_Register(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *ar
 	// For monitoring, set up the input port(s):
 	input_port = jack_port_register(client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
 	if ((input_port == NULL)) {	// || (input_port_right == NULL)
-		interp->result = "JACK: Unable to register input port with server!";
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: Unable to register input port with server!", -1));
 		return TCL_ERROR; 
 	}
 
 	// Don't forget to activate this client:
 	if (jack_activate(client)) {
-		interp->result = "JACK: Unable to activate client!";
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: Unable to activate client!", -1));
 		return TCL_ERROR; 
 	}
 
 	// Maybe this should return "1", "OK", the name of the server or client, or something.  Then again, perhaps nothing is fine.
+	//Tcl_SetObjResult(interp, Tcl_NewStringObj(??server name?? | 1 | whatevs, -1));
 	//interp->result = "1";
 	return TCL_OK;
 }
@@ -193,6 +274,14 @@ Tcljack_Deregister(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 }
 
 
+static int
+Tcljack_Clientname(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
+{
+	CHECK_JACK_REGISTRATION_STATUS;
+	Tcl_SetObjResult(interp, Tcl_NewStringObj(client_name, -1));
+	return TCL_OK;
+}
+
 
 // Retrieve the server's current sampling frequency:
 // TODO: can we also change Fs via libjack?  I'm thinking not.
@@ -209,13 +298,23 @@ Tcljack_Samplerate(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CO
 	// Find and return sampling rate:
 	sampling_rate = jack_get_sample_rate(client);
 
-	result_pointer = Tcl_GetObjResult(interp);	
+	result_pointer = Tcl_GetObjResult(interp);
 	Tcl_SetIntObj(result_pointer, sampling_rate);
 
 	// For string interface:
 //	sprintf(output_buffer, "%d", sampling_rate);
 //	Tcl_SetResult(interp, output_buffer, TCL_VOLATILE);
 
+	return TCL_OK;
+}
+
+
+// Report the JACK buffer size:
+static int
+Tcljack_Buffersize(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
+{
+	CHECK_JACK_REGISTRATION_STATUS;
+	Tcl_SetObjResult(interp, Tcl_NewIntObj(buffer_size));
 	return TCL_OK;
 }
 
@@ -239,7 +338,7 @@ Tcljack_Timecode(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONS
 	current_frame_time = jack_frame_time(client);
 
 	// Currently returns only the current frame position.
-	result_pointer = Tcl_GetObjResult(interp);	
+	result_pointer = Tcl_GetObjResult(interp);
 	Tcl_SetIntObj(result_pointer, current_position.frame);
 	return TCL_OK;
 }
@@ -340,7 +439,7 @@ Tcljack_Transport(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *a
 		{
 			// TODO: "locate"-specific usage message:
 			Tcl_SetResult(interp, "Usage: jack transport locate <frame>", TCL_STATIC);
-			return TCL_ERROR;	
+			return TCL_ERROR;
 		}
 	}
 	else
@@ -353,12 +452,104 @@ Tcljack_Transport(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *a
 }
 
 
+
+// Request that the JACK server switch to a new buffer size (must be a power of 2; should we check for that here, or just rely on the JACK server reporting a failure?).
+static int
+Tcljack_Setbuffersize(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
+{
+        CHECK_JACK_REGISTRATION_STATUS;
+
+	// Args will be like "buffersize 512", i.e. argc == 2, argv[1] == 512
+
+	if (argc != 2) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: Tcljack_Setbuffersize: wrong number of arguments!", -1));
+		return TCL_ERROR;
+	}
+
+	if (jack_set_buffer_size(client, atoi(argv[1])) != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: failed to set requested buffer size!", -1));
+		return TCL_ERROR;
+	} else
+		return TCL_OK;
+}
+
+
+
+
+// Returns a list of all port names (input, output, system, whatever) available/registered on the JACK server we're registered with.
+// TODO: convert to Tcl_Obj interface.
+static int
+Tcljack_Ports(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
+{
+	const char **ports, **connections;
+	unsigned int i;
+//	Tcl_Obj *result_pointer = Tcl_GetObjResult(interp);
+	char *result_list_string;
+	Tcl_Obj *result_list = Tcl_NewListObj(0, NULL);
+
+	CHECK_JACK_REGISTRATION_STATUS;
+
+	// Retrieve the names of all ports from the JACK server
+	// Note that this won't necessarily include all clients (some may have no ports!).
+	ports = jack_get_ports(client, NULL, NULL, 0);
+	for (i = 0; ports[i]; ++i) {
+	//	jack_port_t *port = jack_port_by_name(client, ports[i]);
+		// Can we assume that the only ':' in a fully-qualified port name will be the separator between client and port name elements?
+		// Oh, actually, we can use Tcl_Merge() to build the (properly-structured) list, so we only need this loop to determine the number of elements in the ports array.
+	//	Tcl_AppendStringsToObj(result_pointer, ports[i], NULL);
+	//	Tcl_AppendStringsToObj(result_pointer, " ", NULL);
+		Tcl_ListObjAppendElement(interp, result_list, Tcl_NewStringObj(ports[i], -1));
+	}
+//	Tcl_SetObjResult(interp, result_pointer);
+	// Since jack_get_ports() returns a pointer to an array of chars, I guess we can just use Tcl_Merge() on it, like so:
+//	result_list_string = Tcl_Merge(i, ports);
+//	Tcl_Free((char *) result_pointer);
+//	Tcl_SetResult(interp, result_list_string, TCL_DYNAMIC);
+	// Free "result_list_string", and/or "ports" somehow?
+//	ckfree()?!
+//	Tcl_Free((char *) result_list_string);
+	Tcl_SetObjResult(interp, result_list);
+	free(ports);
+	return TCL_OK;
+}
+
+
+
+
+// Various callback functions internal to TclJACK follow:
+
+// First, the JACK audio buffer size (nperiods x period size) callback
+int
+buffer_size_callback(jack_nframes_t nframes, void *arg)
+{
+	buffer_size = nframes;
+	fprintf(stderr, "tcljack: JACK buffer size changed to %d.\n", buffer_size);
+	return 0;
+}
+
+int
+sample_rate_callback(jack_nframes_t sample_rate_arg, void *arg)
+{
+	sampling_frequency = sample_rate_arg;
+	fprintf(stderr, "tcljack: JACK sampling frequency changed to %d Hz.\n", sampling_frequency);
+	return 0;
+}
+
+
+void
+client_registration_callback(const char* client_name, int registering, void *arg)
+{
+	// Can we print to stderr or some log stream or something?
+	fprintf(stderr, "tcljack: a client (%s) was %s.\n", client_name, registering ? "registered" : "deregistered");
+}
+
+
 // For monitoring, we'll need to set up a port (or two, or n) to receive audio, and define a JACK process() callback fuction.  We've called it process_jack_buffer.
 // This will have level metering capability, calculating statistics over the current JACK sample buffer, and copying the results into the relevant global variables from which they can be read asynchronously from Tcl.
 int
 process_jack_buffer(jack_nframes_t nframes, void *arg)
 {
-	jack_default_audio_sample_t *in;
+	jack_default_audio_sample_t *input;
 //	jack_default_audio_sample_t *in_right;
 	unsigned int i;		// For for-loop index.
 	jack_default_audio_sample_t max_sample = 0.0;		// For peak (largest encountered) value
@@ -366,22 +557,22 @@ process_jack_buffer(jack_nframes_t nframes, void *arg)
 	jack_default_audio_sample_t rms_sum_of_squares = 0.0;	// For RMS level
 	jack_default_audio_sample_t offset_sum = 0.0;	// for DC offset measurement
 	
-	in = jack_port_get_buffer (input_port, nframes);
+	input = jack_port_get_buffer (input_port, nframes);
 	for (i = 0; i < nframes; i++)
 	{
-		const float current_sample = fabs(in[i]);
+		const float current_sample_abs = fabs(input[i]);
 
 		// For peak:
-		if (current_sample > max_sample) { max_sample = current_sample; }
+		if (current_sample_abs > max_sample) { max_sample = current_sample_abs; }
 
 		// For trough:
-		if (current_sample < min_sample) { min_sample = current_sample; }
+		if (current_sample_abs < min_sample) { min_sample = current_sample_abs; }
 
 		// For RMS:
-		rms_sum_of_squares += pow(current_sample,2.0);
+		rms_sum_of_squares += pow(current_sample_abs, 2.0);
 
 		// For DC offset (NOTE: don't use current_sample, which is an absolute value!):
-		offset_sum += in[i];
+		offset_sum += input[i];
 	}
 
 	// Copy the resulting values to their respective global variables, from which they can be read from the Tcl side.
@@ -393,6 +584,8 @@ process_jack_buffer(jack_nframes_t nframes, void *arg)
 
 	return 0;
 }
+
+
 
 
 // Here's where/how subcommands are handled: a dispatcher function to identify and run subcommands of [jack]:
@@ -410,8 +603,16 @@ Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 		return Tcljack_Register(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "deregister") == 0)
 		return Tcljack_Deregister(cdata, interp, argc-1, &argv[1]);
+	else if (strcmp(argv[1], "version") == 0)
+		return Tcljack_Version(cdata, interp, 0, NULL);
+	else if (strcmp(argv[1], "clientname") == 0)
+		return Tcljack_Clientname(cdata, interp, 0, NULL);
 	else if (strcmp(argv[1], "samplerate") == 0)
 		return Tcljack_Samplerate(cdata, interp, 0, NULL);
+	else if (strcmp(argv[1], "buffersize") == 0 && argc == 3)	// e.g. "jack buffersize 512"
+		return Tcljack_Setbuffersize(cdata, interp, argc-1, &argv[1]);
+        else if (strcmp(argv[1], "buffersize") == 0)
+                return Tcljack_Buffersize(cdata, interp, 0, NULL);
 	else if (strcmp(argv[1], "timecode") == 0)
 		return Tcljack_Timecode(cdata, interp, 0, NULL);
 	else if (strcmp(argv[1], "cpuload") == 0)
@@ -420,6 +621,8 @@ Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 		return Tcljack_Meter(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "transport") == 0)
 		return Tcljack_Transport(cdata, interp, argc-1, &argv[1]);
+	else if (strcmp(argv[1], "ports") == 0)
+		return Tcljack_Ports(cdata, interp, 0, NULL);
 	else
 	{
 		Tcl_SetResult(interp, usage_string, TCL_STATIC);
