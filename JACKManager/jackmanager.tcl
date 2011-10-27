@@ -19,6 +19,8 @@
 # Sampling rate display also?  Could be useful if you tend to switch around a lot.
 # Perhaps we could just have one JACK info panel, which could be set to display one of sampling rate, CPU load, server name, buffer configuration.  Are you likely to need to see more than one of these at a time?  Certainly having all displayed would take up a lot of space.
 
+# Does ~/.wishrc not get sourced when executing the script directly?
+set auto_path [lappend auto_path /usr/local/lib/tcl8.5/tcljack]
 
 #wm withdraw .	;# Hide the window initially, until everything is set up
 
@@ -59,7 +61,7 @@ package require TclJACK
 jack register
 
 # Hmm, should probably define in one place what the external and internal names for the various components should be:
-# TODO: make the ordering here and the grid -column specifiers in the individual component files less fragile.
+# TODO: make the ordering here and the grid -column specifiers in the individual component files less fragile.  Perhaps a third "attribute" for which column of the grid the component should be in?  Do we want to allow them to be rearranged?
 set panel_components {
 	{"Main Menu Button"   menubutton}
 	{"Transport Controls" transport}
@@ -67,6 +69,7 @@ set panel_components {
 	{"Sampling Rate"      samplerate}
 	{"CPU DSP Load"       cpuload}
 	{"Audio Meters"       meters}
+	{"MIDI Activity Indicator"	midi_activity_indicator}
 }
 # Maybe put the audio meters after the timecode?  It's more important than Fs and CPU meters.
 
@@ -80,6 +83,7 @@ set timecode_component_enabled 1
 set cpuload_component_enabled 1
 set samplerate_component_enabled 1
 set meters_component_enabled 1
+set midi_activity_indicator_component_enabled 1
 
 
 
