@@ -15,3 +15,11 @@
 		.application_menu.debugging_menu add command -label {overrideredirect off} -command {wm overrideredirect . 0}
 		.application_menu.debugging_menu add command -label {Deiconify} -command {wm deiconify .}
 
+		.application_menu.debugging_menu add command -label {Float Window} -command {float}
+
+		.application_menu.debugging_menu add command -label {Dock Window} -command {dock}
+
+		.application_menu.debugging_menu add command -label {wm frame .} -command {puts [wm frame .]}
+
+
+

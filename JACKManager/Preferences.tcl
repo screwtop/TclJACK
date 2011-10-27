@@ -5,7 +5,7 @@
 # TODO: figure out differences in font metrics or whatever between Tk 8.4 and 8.5 (things appear much bigger in 8.5 for some reason).
 
 # What sort of font settings?  Mono/Sans/Serif?  Or maybe more specific function-based ones, depending on where it'll appear?  Bold in places?
-# Font stuff across Tk verssions could get complicated (8.5 supports TrueType and antialiasing).
+# Font stuff across Tk versions could get complicated (8.5 supports TrueType and antialiasing).
 
 # New attempt using namespace for global preference-oriented variables:
 namespace eval ::tcljack {
@@ -27,6 +27,9 @@ namespace eval ::tcljack {
 #set font_mono  {Letter Gothic 12 Pitch}
 #set ::tcljack::font_mono {LucidaTypewriter 8}
 # Letter Gothic 12 Pitch, Lucida Sans Typewriter, LucidaTypewriter, Orator, Prestige
+# Remember, negative numbers for bitmap (pixel) sizes, positive for points.
+font create font_mono -family lucidatypewriter -size -10	;# was -12
+#font create font_mono -family fixed -size 6
 #font create font_mono -family lucidatypewriter -size -12
 # "fixed" should be available on any X11 installation, right?
 # -size 6 was about right for Tk 8.4, but too big on 8.6 
@@ -54,6 +57,11 @@ set statusbar_foreground_colour {#a0a0a0}
 
 option add *TearOff 1
 option add *font font_sans	;# Actually, maybe better to respect the user's general font preferences.
+
+# You wouldn't be running DeskNerd without X, so we don't have to worry about distinguishing between say preferred console editor and preferred graphical editor.
+set file_manager thunar
+set terminal {urxvt -e bash -l}
+set editor gvim
 
 
 # Tone down the bevelling a little (hard to tell which of these do anything much, although the hand2 thing works):
