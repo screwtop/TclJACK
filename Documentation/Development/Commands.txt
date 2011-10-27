@@ -1,10 +1,13 @@
 What commands do I want for this thing, and what arguments should they support?  I.e. user interface design. ;^)
+Started CME 2009-11-ish
+
 
 # Connecting to JACK server.
 # Should we support multiple connections?  What would Fons do...? ;^)
 # "connect" or "register"?  I think "register" is more correct; the term "connect" should probably be reserved for establishing port connections!
 jack register [ -server <servername> ]
 jack deregister [ -server <servername> ]
+# i.e., register/deregister this client with the specified JACK server.
 
 # Obtaining information from the JACK server:
 jack query ... OR jack info ...
@@ -19,6 +22,9 @@ jack query ... OR jack info ...
 # Ideally we'd allow you to create and destroy input ports for monitoring/metering.  These could optionally have a supplied name.
 jack port create ...
 jack port destroy ...
+# Actually, it's meters we're creating destroying, so maybe:
+jack meter create [-name] <name>
+jack meter destroy [-name] <name>
 
 # Managing port-to-port connections:
 jack connect <source-port> <sink-port>	OR jack port_connect ...

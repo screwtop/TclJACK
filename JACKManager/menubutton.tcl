@@ -17,6 +17,7 @@ proc create_menubutton {} {
 	menu .menubutton.menu
 		.menubutton.menu add command -label $application_name -background grey
 		.menubutton.menu add separator
+		.menubutton.menu add command -label "About $application_name" -command about
 		# ... TODO: copy other stuff from DeskNerd's jack.tcl
 }
 

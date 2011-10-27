@@ -19,10 +19,6 @@
 # Sampling rate display also?  Could be useful if you tend to switch around a lot.
 # Perhaps we could just have one JACK info panel, which could be set to display one of sampling rate, CPU load, server name, buffer configuration.  Are you likely to need to see more than one of these at a time?  Certainly having all displayed would take up a lot of space.
 
-# TODO: figure out how to get Ion's systray layout to refresh when adding (and I guess removing) components.
-# TODO: get the components to go back in the same order when showing/hiding!  Might have to switch to grid layout?
-# TODO: merge in existing stuff from the DeskNerd JACK component (I think it belongs here more) in working towards the proper version of this.
-# TODO: add an xrun counter or alert; perhaps another menubutton, showing the total xrun count, with popup menu items showing the log of recent xruns.  The button could flash red whenever an xrun occurs to alert the user.
 
 #wm withdraw .	;# Hide the window initially, until everything is set up
 
@@ -41,8 +37,12 @@ source Preferences.tcl
 # Now using DKF's one, which returns an "every ID" so you can cancel them at will (needed for FFW/REW transport functionality).
 source every.tcl
 source anticlip.tcl	;# Used in transport.tcl
+source tooltips.tcl	;# Tooltips/balloon-help implementation.
 
-source tooltips.tcl
+# JACKManager components split into separate files:
+source version.tcl
+#source settings_jack.tcl	;# Not ready yet.
+source about.tcl
 
 
 # Might as well actually connect to JACK, since we can...
@@ -112,6 +112,7 @@ bind . <3> "tk_popup .application_menu %X %Y"
 
 # For floating window mode, give the background a suitable cursor
 source floating.tcl
+float
 
 
 # In order to get proper layout inside Ion's statusbar, we have to set the minimum window size.

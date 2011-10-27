@@ -3,13 +3,14 @@
 # NOTE: see also ~/.Xdefaults (Tk honours this file).  
 
 # What sort of font settings?  Mono/Sans/Serif?  Or maybe more specific function-based ones, depending on where it'll appear?  Bold in places?
-# Font stuff across Tk verssions could get complicated (8.5 supports TrueType and antialiasing).
+# Font stuff across Tk versions could get complicated (8.5 supports TrueType and antialiasing).
 
 #{-*-cure-*-*-*-*-11-*-*-*-*-*-*-*}	;# Tiny!
 #set font_mono  {}
 # Letter Gothic 12 Pitch, Lucida Sans Typewriter, LucidaTypewriter, Orator, Prestige
-#font create font_mono -family lucidatypewriter -size -12
-font create font_mono -family fixed -size 6
+# Remember, negative numbers for bitmap (pixel) sizes, positive for points.
+font create font_mono -family lucidatypewriter -size -10	;# was -12
+#font create font_mono -family fixed -size 6
 
 #set font_sans  {-*-helvetica-medium-r-*-*-11-*-*-*-*-*-*-*}
 font create font_sans -family Helvetica -size -12	;# -size is in what units?  Ah, if negative, pixels.
@@ -32,6 +33,11 @@ set statusbar_foreground_colour {#a0a0a0}
 
 option add *TearOff 1
 option add *font font_sans
+
+# You wouldn't be running DeskNerd without X, so we don't have to worry about distinguishing between say preferred console editor and preferred graphical editor.
+set file_manager thunar
+set terminal {urxvt -e bash -l}
+set editor gvim
 
 
 # Tone down the bevelling a little (hard to tell which of these do anything much, although the hand2 thing works):

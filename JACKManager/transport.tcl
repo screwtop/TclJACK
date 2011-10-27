@@ -56,21 +56,24 @@ proc create_transport {} {
 	# TODO: have play and pause buttons change colour to indicate transport state.
 	# Alternative chars: ▪ ▸
 	# FFW, REW generate a single 1-second seek if tapped, but also have separate press and release bindings (defined below) for continuous seeking.
+	# TODO: have pause button query and remember the transport position (if Ardour is slaved and has Auto Return set, pause will return to the last playback start point).
+	# Define the buttons:
 	set transport_buttons {
 		{start {|<} {Return to Start}          {jack transport locate 0}}
 		{rew   {<<} {Rewind}                   {advance -1}}
 		{stop  {[]} {Stop and Return to Start} {jack transport stop; jack transport locate 0}}
-		{play  { >} {Play}                     {jack transport start}}
+		{play  {> } {Play}                     {jack transport start}}
 		{pause {||} {Pause/Stop}               {jack transport stop}}
 		{ffw   {>>} {Fast Forward}             {advance 1}}
 	}
 
+	# Create the buttons:
 	foreach button $transport_buttons {
 		set name [lindex $button 0]
 		set caption [lindex $button 1]
 		set tooltip [lindex $button 2]
 		set command [lindex $button 3]
-		button .transport.$name -text $caption -command $command -font font_mono -padx 1m -pady 1m -cursor hand1
+		button .transport.$name -text $caption -command $command -font font_mono -padx 2m -pady 1m -cursor hand1
 		setTooltip .transport.$name $tooltip
 		pack .transport.$name -side left
 	}
