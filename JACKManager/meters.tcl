@@ -9,9 +9,12 @@ namespace eval ::meters {}
 
 # Some dimensions and meter settings:
 #set ::meters::meter_height 23
-set ::meters::meter_height [expr {[dict get [font metrics $::tcljack::font_mono] -linespace] + 10}]
+set ::meters::meter_height [expr {[dict get [font metrics $::tcljack::font_mono] -linespace] + 10 - 2}]
 #puts $::meters::meter_height
-set ::meters::meter_width [expr {$::meters::meter_height / 4}]
+#set ::meters::meter_width [expr {$::meters::meter_height / 4}]
+set ::meters::meter_width [expr {round($::meters::meter_height / 3.0)}]
+#set ::meters::meter_width [expr {round($::meters::meter_height * (2.0 / (1.0 + sqrt(5.0))))}]
+
 # Meter height working:
 # size: -12:	-ascent 11 -descent 2 -linespace 13 -fixed 1	meter_height: 23
 # size: -10:	-ascent 9 -descent 2 -linespace 11 -fixed 1	meter_height: 21
@@ -48,14 +51,14 @@ proc create_meters {} {
 	frame .meters -borderwidth 1
 
 	grid [frame .meters.sound_gauge  -width $::meters::meter_width  -height $::meters::meter_height  -relief sunken  -borderwidth 1 -background black] -row 0 -column 0
-	
+
 	# Meter gauge is also simply done as a frame:
 	place [frame .meters.sound_gauge.meter     -width [expr {$::meters::meter_width-2}] -height 0  -relief flat -borderwidth 0 -background green] -anchor sw -x 0 -y [expr {$::meters::meter_height-2}]
 
 	setTooltip .meters {Audio signal level(s)}
 
 	# Start the meter updating in the background:
-	# TODO: properly figure out how often to update.  Every 16 ms might be reasonable assuming a 60 Hz display refresh rate.  Or, we could try to update when the JACK process() happens...might be more often than necessary?  
+	# TODO: properly figure out how often to update.  Every 16 ms might be reasonable assuming a 60 Hz display refresh rate.  Or, we could try to update when the JACK process() happens...might be more often than necessary?
 	set ::meters::meter0::updater [every 50 {
 		global meter_width meter_height meter_clipping_point
 

@@ -3,9 +3,13 @@
 
 namespace eval ::midi_activity_indicator {}
 
-# Hmm, meter size compared to font size may still be a bit fudgy...
+# Hmm, meter height compared to font size may still be a bit fudgy...
 set ::midi_activity_indicator::meter_height [expr {[dict get [font metrics $::tcljack::font_mono] -linespace] + 10 - 4}]
-set ::midi_activity_indicator::meter_width $::midi_activity_indicator::meter_height
+set ::midi_activity_indicator::meter_width [expr {round($::midi_activity_indicator::meter_height * (2.0 / (1.0 + sqrt(5.0))))}]
+
+# Active and inactive background and foreground colours:
+set ::midi_activity_indicator::background_colour grey
+# ...
 
 
 
@@ -26,7 +30,15 @@ proc create_midi_activity_indicator {} {
 	# Or should I have a hollow frame that's always recessed, with a plain black/green rectangle for the actual indicator?
 	frame .midi_activity_indicator -borderwidth 1	;# Decorative plain light grey frame to blend in with the text strip
 	grid [frame .midi_activity_indicator.bevel -borderwidth 1 -relief sunken -background black] -row 0 -column 0	;# Dark recessed border
+
+	# The actual indicator frame (wot changes colour):
 	grid [frame .midi_activity_indicator.bevel.indicator  -width $::midi_activity_indicator::meter_width  -height $::midi_activity_indicator::meter_height -background black  -relief flat] -row 0 -column 0
+
+	# Alternatively, it might look nice to have a label (or menubutton, for further MIDI functions) with a musical note glyph.  ♪♫𝅘𝅥𝅮𝅘𝅥𝅯𝅘𝅥
+	# Should we force the height and/or width?  Ah, a menubutton's height is specified in lines of text!
+	# -background black -foreground grey
+	# Maybe force frame and bevel border width above to be 0 to hide them...
+#	grid [menubutton .midi_activity_indicator.bevel.indicator  -text {♫}  -font $::tcljack::font_mono  -relief flat ] -row 0 -column 0
 
 
 	setTooltip .midi_activity_indicator {MIDI activity}
@@ -37,13 +49,16 @@ proc create_midi_activity_indicator {} {
 		# Get JACK MIDI input event count.  If it's greater than 0, turn the indicator green for the next interval, otherwise set it to black.
 		# If we wanted to get fancy, some kind of colour change as we approach the maximum number of MIDI events per JACK period might be appropriate/useful.
 		if {[jack midieventcount] > 0} {
+			set indicator_fg_colour black
 			set indicator_colour green
 		#	set indicator_relief raised
 		} else {
+			set indicator_fg_colour grey
 			set indicator_colour black
 		#	set indicator_relief sunken
 		}
-		
+
+#		.midi_activity_indicator.bevel.indicator  configure  -background $indicator_colour -foreground $indicator_fg_colour	;# For the menubutton option
 		.midi_activity_indicator.bevel.indicator  configure  -background $indicator_colour
 	#	.midi_activity_indicator.indicator  configure  -background $indicator_colour  -relief $indicator_relief
 	}]
