@@ -11,7 +11,7 @@
 
 
 /* TODO:
- * Fix apparent memory leak in Tcljack_Ports()!  Also, have it return a proper list (to handle port names containing spaces).
+ * DONE: Fix apparent memory leak in Tcljack_Ports()!  Also, have it return a proper list (to handle port names containing spaces).
  * Figure out how to handle disconnections from JACK properly.
  * Learn about option/argument handling, and implement for [jack meter -peak -rms -trough -db].
  * Investigate event handling: how does a Tcl extension declare and generate an event?  Or handle a Tcl event?  Or are these only relevant in Tk, which has an event loop?  Ah, see Tcl_CreateEventSource(), and http://wiki.tcl.tk/17195.
@@ -107,9 +107,9 @@ static char usage_string[] = "TclJACK (JACK audio server interface for Tcl)\nUsa
 	"\n	jack cpuload"
 	"\n	jack servername"
 	"\n	jack clientname"
-	"\n	jack info"
 	"\n	jack version"
 	"\n	jack ports"
+	"\n	jack midieventcount"
 //	"	jack meter -peak -rms -trough\n"
 ;
 
@@ -499,7 +499,7 @@ Tcljack_Setbuffersize(ClientData cdata, Tcl_Interp *interp, int argc,  CONST cha
 
 
 // Returns a list of all port names (input, output, system, whatever) available/registered on the JACK server we're registered with.
-// TODO: convert to Tcl_Obj interface.
+// DONE: convert to Tcl_Obj interface.
 static int
 Tcljack_Ports(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
