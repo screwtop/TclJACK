@@ -18,7 +18,7 @@ namespace eval ::tcljack {
 
 #	set font_string_sans {Helvetica 12}
 
-	font create font_mono -family $font_mono_face -size $font_mono_size
+#	font create font_mono -family $font_mono_face -size $font_mono_size
 }
 
 #font create font_mono -family LucidaTypewriter -size -12

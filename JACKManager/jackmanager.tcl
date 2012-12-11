@@ -1,4 +1,4 @@
-#!/usr/bin/wish
+#!/usr/bin/wish8.5
 
 # General JACK manager/control panel utility, suitable for popping in the desktop systray.
 # (Started out as transport_mockup.tcl)
