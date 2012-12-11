@@ -36,6 +36,7 @@
 
 #include <tcl.h>
 //#include <string.h>?
+#include <errno.h>	// for EEXIST
 #include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>	// for free()
@@ -45,7 +46,7 @@
 
 // Hmm, we're gonna need some global variables for holding various items of state, huh?
 static int counter = 0;	// This was just for testing
-static jack_client_t *client;	// That's us!
+static jack_client_t *client;	// That's us!  Maybe call it "us" or "tcljack" or "this" or something?
 static jack_status_t status;
 static jack_options_t options = JackNoStartServer;
 static jack_nframes_t sampling_frequency;	// (or "sample_rate" or "sampling_rate" or "jack_samplerate"?) in Hz.
@@ -109,6 +110,8 @@ static char usage_string[] = "TclJACK (JACK audio server interface for Tcl)\nUsa
 	"\n	jack clientname"
 	"\n	jack version"
 	"\n	jack ports"
+	"\n	jack connect <source_port_name> <destination_port_name>"
+	"\n	jack disconnect <source_port_name> <destination_port_name>"
 	"\n	jack midieventcount"
 //	"	jack meter -peak -rms -trough\n"
 ;
@@ -249,6 +252,7 @@ Tcljack_Register(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *ar
 //	jack_on_shutdown(client, jack_shutdown, 0);
 
 	// For monitoring, set up the input port(s):
+	// Eventually, we'll want this to be dynamic (stereo monitoring would be a common use case).
 	input_port = jack_port_register(client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
 	if ((input_port == NULL)) {	// || (input_port_right == NULL)
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: Unable to register input port with server!", -1));
@@ -536,6 +540,64 @@ Tcljack_Ports(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[
 }
 
 
+// Connect a JACK port to another.  These should be of the same type, and must connect an output to an input.
+// Note that JACK ports can have several names: a full name, a short name, and potentially multiple aliases (as well as an internal ID number?! or am I misremembering?)  Initially, we'll require full names, as reported by jack_get_ports().
+// Example Tcl command: "jack connect firewire_pcm:0014866faed68daf_Unknown_in tcljack-01:input"
+// Note that the JACK API has a couple of ways of referring to ports: by name, or by handle, with different calls accordingly.  We're just using names here initially.  Might it be better to name our function here Tcljack_Named_Port_Connect?  Or Tcljack_Port_Connect_By_Name?  In case we add a _By_Handle later on?
+static int
+Tcljack_Port_Connect(ClientData cdata, Tcl_Interp *interp, int argc, CONST char *argv[])
+{
+	int result = 0;
+
+	CHECK_JACK_REGISTRATION_STATUS;
+
+	// argv[0] is the subcommand name, which would be "connect".  argv[1] should be the source port name, and argv[2] the destination port name.
+	if (argc < 3)
+	{
+		Tcl_SetResult(interp, "Usage: jack connect <source_port_name> <destination_port_name>", TCL_STATIC);
+		return TCL_ERROR;
+	}
+
+	result = jack_connect(client, argv[1], argv[2]);
+
+	if (result == 0) {
+		return TCL_OK;
+	} else if (result == EEXIST) {
+		Tcl_SetResult(interp, "jack connect: connection already exists.", TCL_STATIC);
+		return TCL_ERROR;
+	} else {
+		// TODO: more detail on the error!
+		Tcl_SetResult(interp, "jack connect: error.", TCL_STATIC);
+		return TCL_ERROR;
+	}
+}
+
+// Disconnect a JACK port from another.  The connections among ports can of course be many-to-many.
+static int
+Tcljack_Port_Disconnect(ClientData cdata, Tcl_Interp *interp, int argc, CONST char *argv[])
+{
+	int result = 0;
+
+	CHECK_JACK_REGISTRATION_STATUS;
+
+	// argv[0] is the subcommand name, which would be "disconnect".  argv[1] should be the source port name, and argv[2] the destination port name.
+	if (argc < 3)
+	{
+		Tcl_SetResult(interp, "Usage: jack disconnect <source_port_name> <destination_port_name>", TCL_STATIC);
+		return TCL_ERROR;
+	}
+
+	result = jack_disconnect(client, argv[1], argv[2]);
+
+	if (result == 0) {
+		return TCL_OK;
+	} else {
+		// TODO: more detail on the error!
+		Tcl_SetResult(interp, "jack disconnect: error.", TCL_STATIC);
+		return TCL_ERROR;
+	}
+}
+
 
 // Return the number of MIDI events received (since we last checked, or since we registered.)
 static int
@@ -666,6 +728,10 @@ Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 		return Tcljack_Transport(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "ports") == 0)
 		return Tcljack_Ports(cdata, interp, 0, NULL);
+	else if (strcmp(argv[1], "connect") == 0)
+		return Tcljack_Port_Connect(cdata, interp, argc-1, &argv[1]);
+	else if (strcmp(argv[1], "disconnect") == 0)
+		return Tcljack_Port_Disconnect(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "midieventcount") == 0)
 		return Tcljack_Midieventcount(cdata, interp, 0, NULL);
 	else
