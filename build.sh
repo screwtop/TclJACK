@@ -16,4 +16,5 @@ gcc -fPIC -shared -o libtcljack.so -DUSE_TCL_STUBS -I$TCLINC tcljack.c -L$TCLLIB
 # Also (re-)generate the pkgIndex.tcl file for the library and install:
 echo 'pkg_mkIndex . libtcljack.so' | tclsh
 mkdir -p /usr/local/lib/tcl8.5/tcljack
-cp libtcljack.so pkgIndex.tcl /usr/local/lib/tcl8.5/tcljack/
+cp libtcljack.so pkgIndex.tcl /tmp
+sudo cp /tmp/libtcljack.so /tmp/pkgIndex.tcl /usr/local/lib/tcl8.5/tcljack/
