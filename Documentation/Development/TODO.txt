@@ -1,7 +1,8 @@
 tcljack.c
 [ ] Server auto-start?
 [ ] Query real-time mode?
-[ ] Dynamic port allocation for n-channel metering.
+[ ] Dynamic port allocation for n-channel metering (for MIDI as well as audio?).
+[ ] JACK port connect/disconnect functionality.
 
 JACKManager:
 [ ] Have Pause button store the transport location so it can resume from there
@@ -17,4 +18,5 @@ JACKManager:
 [ ] Maybe split main menu into multiple menus: Connections, Server Control
 [ ] JACK server messages window.
 [ ] XRUN meter component.
-
+[ ] (Optionally) display DSP CPU load as a graph?
+[ ] Matrix patchbay (preferably slanted 45 degrees so source and target can both be horizontal)
