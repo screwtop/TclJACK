@@ -111,6 +111,7 @@ static char usage_string[] = "TclJACK (JACK audio server interface for Tcl)\nUsa
 	"\n	jack version"
 	"\n	jack ports"
 	"\n	jack portflags <port_name>"
+	"\n	jack porttype <port_name>"
 	"\n	jack connect <source_port_name> <destination_port_name>"
 	"\n	jack disconnect <source_port_name> <destination_port_name>"
 	"\n	jack midieventcount"
@@ -392,7 +393,7 @@ Tcljack_Cpuload(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *arg
 // This function provides a single command for polled level metering, to ensure that we use the same measurement window for all measurements.  Returning a tuple, essentially (as a Tcl list, I guess).
 // It would be nice to have an alternative push-style means of returning metering information to Tcl.  Perhaps a Tcl I/O channel would be the way to do this.
 // TODO: handle args for different measurements.  Peak, trough, and RMS are recorded by process_jack_buffer(); here we just have to output them.
-// TODO: could perhaps optionally do conversion to dB (either numeric or AES-17 dB FS), Stevens RMS loudness, etc. as well.  That stuff isn't happening at the audio data rate, so delegating to the Tcl layer shouldn't be a performance problem.
+// TODO: could perhaps optionally do conversion to dB (either numeric or AES-17 dB FS), Stevens RMS loudness, etc. as well.  Actually, that stuff wouldn't be happening at the audio data rate, so delegating to the Tcl layer might not cause a performance problem.
 // TODO: possibly also have a flag for whether metering should be done or not (with the process function adapting accordingly).
 // Would be better I think to pass the floats as objects and not have to worry about string formatting here.  TODO: investigate.
 static int
@@ -550,6 +551,8 @@ Tcljack_Port_Flags(ClientData cdata, Tcl_Interp *interp, int argc, CONST char *a
 	int port_flags = 0;
 	Tcl_Obj *result_flag_list = Tcl_NewListObj(0, NULL);
 
+	CHECK_JACK_REGISTRATION_STATUS;
+
 	if (argc != 2) {
 		Tcl_SetResult(interp, "Usage: jack portflags <port-name>", TCL_STATIC);
 		return TCL_ERROR;
@@ -576,6 +579,32 @@ Tcljack_Port_Flags(ClientData cdata, Tcl_Interp *interp, int argc, CONST char *a
 
 	return TCL_OK;
 }
+
+
+// Return the "type" of a JACK audio port, specified by name.  The JACK API just seems to return a string including things like whether it's audio or MIDI and what data format is being used.  Interesting that audio ports are reported as being "mono" when JACK by design only deals with monophonic streams.
+static int
+Tcljack_Port_Type(ClientData cdata, Tcl_Interp *interp, int argc, CONST char *argv[])
+{
+	jack_port_t* port;
+
+	CHECK_JACK_REGISTRATION_STATUS;
+
+	if (argc != 2) {
+		Tcl_SetResult(interp, "Usage: jack porttype <port-name>", TCL_STATIC);
+		return TCL_ERROR;
+	}
+
+	port = jack_port_by_name(client, argv[1]);
+	if (!port) {
+		Tcl_SetResult(interp, "jack porttype: failed to find port by name.", TCL_STATIC);
+		return TCL_ERROR;
+	}
+
+	Tcl_SetResult(interp, (char *)jack_port_type(port), TCL_VOLATILE);
+
+	return TCL_OK;
+}
+
 
 // Connect a JACK port to another.  These should be of the same type, and must connect an output to an input.
 // Note that JACK ports can have several names: a full name, a short name, and potentially multiple aliases (as well as an internal ID number?! or am I misremembering?)  Initially, we'll require full names, as reported by jack_get_ports().
@@ -636,7 +665,7 @@ Tcljack_Port_Disconnect(ClientData cdata, Tcl_Interp *interp, int argc, CONST ch
 }
 
 
-// Return the number of MIDI events received (since we last checked, or since we registered.)
+// Return the number of MIDI events received (since we last checked, or since we registered.)  This is not only a simple way for me to try out JACK's MIDI API, but also to help in implementing the MIDI activity indicator in JACKManager.
 static int
 Tcljack_Midieventcount(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
@@ -681,7 +710,7 @@ client_registration_callback(const char* client_name, int registering, void *arg
 
 
 
-// For monitoring, we'll need to set up a port (or two, or n) to receive audio, and define a JACK process() callback fuction.  We've called it process_jack_buffer.
+// For monitoring, we'll need to set up a port (or two, or (dynamically) n) to receive audio, and define a JACK process() callback fuction.  We've called it process_jack_buffer.
 // This will have level metering capability, calculating statistics over the current JACK sample buffer, and copying the results into the relevant global variables from which they can be read asynchronously from Tcl.
 int
 process_jack_buffer(jack_nframes_t nframes, void *arg)
@@ -767,6 +796,8 @@ Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 		return Tcljack_Ports(cdata, interp, 0, NULL);
 	else if (strcmp(argv[1], "portflags") == 0)
 		return Tcljack_Port_Flags(cdata, interp, argc-1, &argv[1]);
+	else if (strcmp(argv[1], "porttype") == 0)
+		return Tcljack_Port_Type(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "connect") == 0)
 		return Tcljack_Port_Connect(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "disconnect") == 0)
