@@ -110,6 +110,7 @@ static char usage_string[] = "TclJACK (JACK audio server interface for Tcl)\nUsa
 	"\n	jack clientname"
 	"\n	jack version"
 	"\n	jack ports"
+	"\n	jack portflags <port_name>"
 	"\n	jack connect <source_port_name> <destination_port_name>"
 	"\n	jack disconnect <source_port_name> <destination_port_name>"
 	"\n	jack midieventcount"
@@ -516,7 +517,8 @@ Tcljack_Ports(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[
 	CHECK_JACK_REGISTRATION_STATUS;
 
 	// Retrieve the names of all ports from the JACK server
-	// Note that this won't necessarily include all clients (some may have no ports!).
+	// Note that this won't necessarily include all clients (some might have no ports!).
+	// From the docs, jack_get_ports() returns "a NULL-terminated array of ports that match the specified arguments. The caller is responsible for calling jack_free(3) any non-NULL returned value."
 	ports = jack_get_ports(client, NULL, NULL, 0);
 	for (i = 0; ports[i]; ++i) {
 	//	jack_port_t *port = jack_port_by_name(client, ports[i]);
@@ -540,6 +542,41 @@ Tcljack_Ports(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[
 }
 
 
+// Get information about a JACK port.  Makes sense to return a list.  Hmm, there's jack_port_flags() and also jack_port_type().  Flag constants include JackPortIsInput, JackPortIsOutput, JackPortIsPhysical, JackPortCanMonitor, JackPortIsTerminal.  We need to use jack_port_by_name() to obtain a jack_port_t* handle from the name string.
+static int
+Tcljack_Port_Flags(ClientData cdata, Tcl_Interp *interp, int argc, CONST char *argv[])
+{
+	jack_port_t* port;
+	int port_flags = 0;
+	Tcl_Obj *result_flag_list = Tcl_NewListObj(0, NULL);
+
+	if (argc != 2) {
+		Tcl_SetResult(interp, "Usage: jack portflags <port-name>", TCL_STATIC);
+		return TCL_ERROR;
+	}
+
+	port = jack_port_by_name(client, argv[1]);
+	if (!port) {
+		Tcl_SetResult(interp, "jack portflags: failed to find port by name.", TCL_STATIC);
+		return TCL_ERROR;
+	}
+	port_flags = jack_port_flags(port);
+
+	// Loop through the known port flag bitmasks, and append a corresponding string to the output list for any that are set.
+	// Well, only C is too low-level to do something handy like looping through a list of symbols, right?
+	// Don't forget that the "output"/"input" terminology is from the perspective of the client owning the port, not JACK or the computer system.
+
+	if (port_flags & JackPortIsInput)    {Tcl_ListObjAppendElement(interp, result_flag_list, Tcl_NewStringObj("input",    -1));}
+	if (port_flags & JackPortIsOutput)   {Tcl_ListObjAppendElement(interp, result_flag_list, Tcl_NewStringObj("output",   -1));}
+	if (port_flags & JackPortIsPhysical) {Tcl_ListObjAppendElement(interp, result_flag_list, Tcl_NewStringObj("physical", -1));}
+	if (port_flags & JackPortCanMonitor) {Tcl_ListObjAppendElement(interp, result_flag_list, Tcl_NewStringObj("monitor",  -1));}
+	if (port_flags & JackPortIsTerminal) {Tcl_ListObjAppendElement(interp, result_flag_list, Tcl_NewStringObj("terminal", -1));}
+
+	Tcl_SetObjResult(interp, result_flag_list);
+
+	return TCL_OK;
+}
+
 // Connect a JACK port to another.  These should be of the same type, and must connect an output to an input.
 // Note that JACK ports can have several names: a full name, a short name, and potentially multiple aliases (as well as an internal ID number?! or am I misremembering?)  Initially, we'll require full names, as reported by jack_get_ports().
 // Example Tcl command: "jack connect firewire_pcm:0014866faed68daf_Unknown_in tcljack-01:input"
@@ -552,7 +589,7 @@ Tcljack_Port_Connect(ClientData cdata, Tcl_Interp *interp, int argc, CONST char 
 	CHECK_JACK_REGISTRATION_STATUS;
 
 	// argv[0] is the subcommand name, which would be "connect".  argv[1] should be the source port name, and argv[2] the destination port name.
-	if (argc < 3)
+	if (argc != 3)
 	{
 		Tcl_SetResult(interp, "Usage: jack connect <source_port_name> <destination_port_name>", TCL_STATIC);
 		return TCL_ERROR;
@@ -581,7 +618,7 @@ Tcljack_Port_Disconnect(ClientData cdata, Tcl_Interp *interp, int argc, CONST ch
 	CHECK_JACK_REGISTRATION_STATUS;
 
 	// argv[0] is the subcommand name, which would be "disconnect".  argv[1] should be the source port name, and argv[2] the destination port name.
-	if (argc < 3)
+	if (argc != 3)
 	{
 		Tcl_SetResult(interp, "Usage: jack disconnect <source_port_name> <destination_port_name>", TCL_STATIC);
 		return TCL_ERROR;
@@ -728,6 +765,8 @@ Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 		return Tcljack_Transport(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "ports") == 0)
 		return Tcljack_Ports(cdata, interp, 0, NULL);
+	else if (strcmp(argv[1], "portflags") == 0)
+		return Tcljack_Port_Flags(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "connect") == 0)
 		return Tcljack_Port_Connect(cdata, interp, argc-1, &argv[1]);
 	else if (strcmp(argv[1], "disconnect") == 0)
