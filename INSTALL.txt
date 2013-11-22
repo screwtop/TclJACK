@@ -1,0 +1,10 @@
+Installation instructions for TclJACK, a Tcl library wrapper for the JACK audio server library.
+
+Edit Makefile to set variables as appropriate, then run:
+  
+  make
+
+Then, as root:
+
+  make install
+
