@@ -424,37 +424,25 @@ static int
 //Tcljack_Meter(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
 Tcljack_Meter(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
-	Tcl_Obj *result_pointer;	// TODO: decommission
-	Tcl_Obj *result_list_pointer;
-	// Testing with just returning one double value:
-//	Tcl_Obj *result_float_pointer
-
-	// Now that we have multiple meters, it's not really practical to set up a fixed output string buffer.  How to do this properly?  Is there something in the Tcl C API we could use?
-//	result_list_pointer = Tcl_NewListObj(0, NULL);
-
-//	char output_buffer[(1 + 3 + 4 * (1 + 1 + 16)) + 1];	// How big depends on the format in sprintf below: 1 for terminating null, 2 spaces, 3 numbers, 1 digit, 1 for decimal point, 8 DP.  Should maybe #define some of these and use in the format below (TODO).
-	// Furthermore, if we're returning all the meters' data, we'll need to multiply by the number of meters (and add space for the list separators and enclosing braces).
-	// Tcl uses 16 DP for floats, FWIW.
-	// Oh, DC offset could be negative!  Need to reserve space for that possibility.
+	Tcl_Obj *result_list_pointer, *stats_list_pointer;
+	int channel_number = 0;
 
 	CHECK_JACK_REGISTRATION_STATUS;
 
-	result_list_pointer = Tcl_NewListObj(0, NULL);
-	if (Tcl_ListObjAppendElement(interp, result_list_pointer, Tcl_NewDoubleObj(audio_port_stats[0].buffer_peak))      != TCL_OK) {return TCL_ERROR;}
-	if (Tcl_ListObjAppendElement(interp, result_list_pointer, Tcl_NewDoubleObj(audio_port_stats[0].buffer_rms))       != TCL_OK) {return TCL_ERROR;}
-	if (Tcl_ListObjAppendElement(interp, result_list_pointer, Tcl_NewDoubleObj(audio_port_stats[0].buffer_trough))    != TCL_OK) {return TCL_ERROR;}
-	if (Tcl_ListObjAppendElement(interp, result_list_pointer, Tcl_NewDoubleObj(audio_port_stats[0].buffer_dc_offset)) != TCL_OK) {return TCL_ERROR;}
+	// TODO: check args to see if a specific metering port's stats were requested.
+	// Otherwise, just return a list of stats for all ports...
 
+	result_list_pointer = Tcl_NewListObj(0, NULL);	// The stats will be returned ultimately as a single list (containing lists of audio stats)
 
-	// TODO: check args to see which metering port's stats were requested.
-	// ...alternatively, return the stats for all ports as a list.
-/*
-	sprintf(output_buffer, "%1.16f %1.16f %1.16f %1.16f", audio_port_stats[0].buffer_peak, audio_port_stats[0].buffer_rms, audio_port_stats[0].buffer_trough, audio_port_stats[0].buffer_dc_offset);
-	Tcl_SetResult(interp, output_buffer, TCL_VOLATILE);
-*/
-//	result_pointer = Tcl_GetObjResult(interp);
-//	Tcl_SetDoubleObj(result_pointer, audio_port_stats[0].buffer_rms);
-//	Tcl_SetObjResult(interp, result_list_pointer);
+	for (channel_number = 0; channel_number < num_audio_meters; channel_number++) {
+		stats_list_pointer = Tcl_NewListObj(0, NULL);	// Sublist for just the current port's stats
+		if (Tcl_ListObjAppendElement(interp, stats_list_pointer, Tcl_NewDoubleObj(audio_port_stats[channel_number].buffer_peak))      != TCL_OK) {return TCL_ERROR;}
+		if (Tcl_ListObjAppendElement(interp, stats_list_pointer, Tcl_NewDoubleObj(audio_port_stats[channel_number].buffer_rms))       != TCL_OK) {return TCL_ERROR;}
+		if (Tcl_ListObjAppendElement(interp, stats_list_pointer, Tcl_NewDoubleObj(audio_port_stats[channel_number].buffer_trough))    != TCL_OK) {return TCL_ERROR;}
+		if (Tcl_ListObjAppendElement(interp, stats_list_pointer, Tcl_NewDoubleObj(audio_port_stats[channel_number].buffer_dc_offset)) != TCL_OK) {return TCL_ERROR;}
+		// Finally, assign the sublist to the main result list?!
+		if (Tcl_ListObjAppendElement(interp, result_list_pointer, stats_list_pointer) != TCL_OK) {return TCL_ERROR;}
+	}
 
 	Tcl_SetObjResult(interp, result_list_pointer);
 	return TCL_OK;
