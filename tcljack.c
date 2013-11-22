@@ -61,33 +61,48 @@ static bool registered = false;
 // For built-in level metering, we'll need some global variables for storing peak, trough and RMS values for the current buffer.
 // ...and of course the ports themselves!  Naming: input_port, meter_port or monitor_port?
 // TODO: maintain an array of input ports and allow for creating/destroying them dynamically via Tcl commands.
-jack_port_t *input_port;
-// jack_port_t *input_port_left;
-// jack_port_t *input_port_right;
+//jack_port_t *input_port;
+jack_port_t *input_port_left;	// TODO: remove
+jack_port_t *input_port_right;	// TODO: remove
+// Actually, it should probably be an array:
+//int num_audio_meters = 2;	// TODO: make variable and dynamically-allocated n stuff.
+#define num_audio_meters (2)
+jack_port_t *input_ports[num_audio_meters];
 jack_port_t *midi_input_port;
 
+
+// Hmm, should the struct have just the stats, or everything to do with an audio metering port?
+// Note that there is already a jack_port_t which should be used for stuff like the port name.
 // Do we need to declare these as volatile or something?
-static float buffer_peak = 0.0;
-static float buffer_trough = 0.0;
-static float buffer_rms = 0.0;
-static float buffer_dc_offset = 0.0;
-// It might be nice to provide an interface for taking longer-term measurements (i.e. keep accumulating indefinitely (until reset)).
-// What about wraparound?!
-static unsigned long long long_term_frame_count = 0;
-static float long_term_peak = 0.0;
-static float long_term_trough = 0.0;
-static float long_term_dc_offset = 0.0;
-static float long_term_rms_sum_of_squares = 0.0;
-// And similarly for periodic metering (accumulate measurements over n frames):
-// Not as nice as being able to specify a number of milliseconds for the window size, but easier to implement!
-// Oh, what if the JACK buffering scheme changes while measuring?!  Just reset these, I guess.  Callback.
-static unsigned long long periodic_frame_count = 0.0;
-static float periodic_peak = 0.0;
-static float periodic_trough = 0.0;
-static float periodic_dc_offset = 0.0;
-static float periodic_rms_sum_of_squares = 0.0;
-// Perhaps also a convenience boolean to indicate presence of a signal on the input port (or, TODO, ports).
-static bool signal_present = false;
+typedef struct audio_port_stats_t {
+	float buffer_peak;
+	float buffer_trough;
+	float buffer_rms;
+	float buffer_dc_offset;
+	// It might be nice to provide an interface for taking longer-term measurements (i.e. keep accumulating indefinitely (until reset)).
+	// What about wraparound?!
+	unsigned long long long_term_frame_count;
+	float long_term_peak;
+	float long_term_trough;
+	float long_term_dc_offset;
+	float long_term_rms_sum_of_squares;
+	// And similarly for periodic metering (accumulate measurements over n frames):
+	// Not as nice as being able to specify a number of milliseconds for the window size, but easier to implement!
+	// Oh, what if the JACK buffering scheme changes while measuring?!  Just reset these, I guess.  Callback.
+	unsigned long long periodic_frame_count;
+	float periodic_peak;
+	float periodic_trough;
+	float periodic_dc_offset;
+	float periodic_rms_sum_of_squares;
+	// Perhaps also a convenience boolean to indicate presence of a signal on the input port (or, TODO, ports).
+	bool signal_present;
+} audio_port_stats_t;
+
+// Fixed-size stereo array of these for now (incremental development/stepwise refinement!):
+static audio_port_stats_t audio_port_stats[2];
+
+
+// For the MIDI monitor/meter:
 static jack_nframes_t midi_event_count = 0;	// Maintain a count of MIDI events since it was last queried (for use as/in a simple MIDI activity monitor).
 
 
@@ -214,6 +229,8 @@ Tcljack_Version(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST
 static int
 Tcljack_Register(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
+	int channel_num;	// channel for loop counter
+
 	// NOTE: Crashes can occur if you try to register when you are already registered.
 	// If already registered, should we raise a Tcl error, or just disconnect and reconnect?
 	if (registered) {jack_client_close(client);}
@@ -255,11 +272,17 @@ Tcljack_Register(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *ar
 
 	// For monitoring, set up the input port(s):
 	// Eventually, we'll want this to be dynamic (stereo monitoring would be a common use case).
-	input_port = jack_port_register(client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
-	if ((input_port == NULL)) {	// || (input_port_right == NULL)
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: Unable to register input port with server!", -1));
-		return TCL_ERROR;
+	char port_name[10];	// Remember, they'll be null-terminated.
+	for (channel_num = 0; channel_num < num_audio_meters; channel_num++) {
+		sprintf(port_name, "input_%02d", channel_num);
+		input_ports[channel_num] = jack_port_register(client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+		if ((input_ports[channel_num] == NULL)) {	// || (input_port_right == NULL)
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("JACK: Unable to register input port with server!", -1));
+			return TCL_ERROR;
+			// Note that failure here will prevent the jack_activate() below from being called, so basically lots of stuff won't work.  TODO: redesign.
+		}
 	}
+
 
 	// We'll also open a MIDI port for simple MIDI activity monitoring (maintaning a cumulative count of events)
 	midi_input_port = jack_port_register(client, "midi_input", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
@@ -391,7 +414,8 @@ Tcljack_Cpuload(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *arg
 
 
 // This function provides a single command for polled level metering, to ensure that we use the same measurement window for all measurements.  Returning a tuple, essentially (as a Tcl list, I guess).
-// It would be nice to have an alternative push-style means of returning metering information to Tcl.  Perhaps a Tcl I/O channel would be the way to do this.
+// It would be nice to have an alternative push-style means of returning metering information to Tcl, once per JACK processing period.  Perhaps a Tcl I/O channel would be the way to do this.
+// TODO: refactor this to handle <n> meters.
 // TODO: handle args for different measurements.  Peak, trough, and RMS are recorded by process_jack_buffer(); here we just have to output them.
 // TODO: could perhaps optionally do conversion to dB (either numeric or AES-17 dB FS), Stevens RMS loudness, etc. as well.  Actually, that stuff wouldn't be happening at the audio data rate, so delegating to the Tcl layer might not cause a performance problem.
 // TODO: possibly also have a flag for whether metering should be done or not (with the process function adapting accordingly).
@@ -400,18 +424,39 @@ static int
 //Tcljack_Meter(ClientData cdata, Tcl_Interp *interp, int objc,  Tcl_Obj * CONST objv[])
 Tcljack_Meter(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[])
 {
-	Tcl_Obj *result_pointer;
-	char output_buffer[(1 + 3 + 4 * (1 + 1 + 16)) + 1];	// How big depends on the format in sprintf below: 1 for terminating null, 2 spaces, 3 numbers, 1 digit, 1 for decimal point, 8 DP.  Should maybe #define some of these and use in the format below (TODO).
+	Tcl_Obj *result_pointer;	// TODO: decommission
+	Tcl_Obj *result_list_pointer;
+	// Testing with just returning one double value:
+//	Tcl_Obj *result_float_pointer
+
+	// Now that we have multiple meters, it's not really practical to set up a fixed output string buffer.  How to do this properly?  Is there something in the Tcl C API we could use?
+//	result_list_pointer = Tcl_NewListObj(0, NULL);
+
+//	char output_buffer[(1 + 3 + 4 * (1 + 1 + 16)) + 1];	// How big depends on the format in sprintf below: 1 for terminating null, 2 spaces, 3 numbers, 1 digit, 1 for decimal point, 8 DP.  Should maybe #define some of these and use in the format below (TODO).
+	// Furthermore, if we're returning all the meters' data, we'll need to multiply by the number of meters (and add space for the list separators and enclosing braces).
 	// Tcl uses 16 DP for floats, FWIW.
 	// Oh, DC offset could be negative!  Need to reserve space for that possibility.
 
 	CHECK_JACK_REGISTRATION_STATUS;
 
-	sprintf(output_buffer, "%1.16f %1.16f %1.16f %1.16f", buffer_peak, buffer_rms, buffer_trough, buffer_dc_offset);
+	result_list_pointer = Tcl_NewListObj(0, NULL);
+	if (Tcl_ListObjAppendElement(interp, result_list_pointer, Tcl_NewDoubleObj(audio_port_stats[0].buffer_peak))      != TCL_OK) {return TCL_ERROR;}
+	if (Tcl_ListObjAppendElement(interp, result_list_pointer, Tcl_NewDoubleObj(audio_port_stats[0].buffer_rms))       != TCL_OK) {return TCL_ERROR;}
+	if (Tcl_ListObjAppendElement(interp, result_list_pointer, Tcl_NewDoubleObj(audio_port_stats[0].buffer_trough))    != TCL_OK) {return TCL_ERROR;}
+	if (Tcl_ListObjAppendElement(interp, result_list_pointer, Tcl_NewDoubleObj(audio_port_stats[0].buffer_dc_offset)) != TCL_OK) {return TCL_ERROR;}
+
+
+	// TODO: check args to see which metering port's stats were requested.
+	// ...alternatively, return the stats for all ports as a list.
+/*
+	sprintf(output_buffer, "%1.16f %1.16f %1.16f %1.16f", audio_port_stats[0].buffer_peak, audio_port_stats[0].buffer_rms, audio_port_stats[0].buffer_trough, audio_port_stats[0].buffer_dc_offset);
 	Tcl_SetResult(interp, output_buffer, TCL_VOLATILE);
+*/
+//	result_pointer = Tcl_GetObjResult(interp);
+//	Tcl_SetDoubleObj(result_pointer, audio_port_stats[0].buffer_rms);
+//	Tcl_SetObjResult(interp, result_list_pointer);
 
-//	Tcl_SetObjResult(interp, Tcl_???());
-
+	Tcl_SetObjResult(interp, result_list_pointer);
 	return TCL_OK;
 }
 
@@ -715,39 +760,51 @@ client_registration_callback(const char* client_name, int registering, void *arg
 int
 process_jack_buffer(jack_nframes_t nframes, void *arg)
 {
-	jack_default_audio_sample_t *input, *midi_input_buffer;
+	jack_default_audio_sample_t *input[num_audio_meters];	// Array of audio processing buffers
+	jack_default_audio_sample_t *midi_input_buffer;	// One port for MIDI monitoring.
+
 //	jack_default_audio_sample_t *in_right;
-	unsigned int i;		// For for-loop index.
+	unsigned int channel;		// For indexing the input ports/channels.
+	unsigned int frame;		// For for-loop audio buffer index.
+
+	// Temporary variables for the analysis pass:
 	jack_default_audio_sample_t max_sample = 0.0;           // For peak (largest encountered) value
 	jack_default_audio_sample_t min_sample = 1.0;           // For trough (smallest non-zero) value
 	jack_default_audio_sample_t rms_sum_of_squares = 0.0;   // For RMS level
 	jack_default_audio_sample_t offset_sum = 0.0;           // for DC offset measurement
 
-	input = jack_port_get_buffer (input_port, nframes);
-	for (i = 0; i < nframes; i++)
-	{
-		const float current_sample_abs = fabs(input[i]);
+	for (channel = 0; channel < num_audio_meters; channel++) {
+		// Reset stats for this channel's buffer:
+		max_sample = 0.0;
+		min_sample = 1.0;
+		rms_sum_of_squares = 0.0;
+		offset_sum = 0.0;
 
-		// For peak:
-		if (current_sample_abs > max_sample) { max_sample = current_sample_abs; }
-
-		// For trough:
-		if (current_sample_abs < min_sample) { min_sample = current_sample_abs; }
-
-		// For RMS:
-		rms_sum_of_squares += pow(current_sample_abs, 2.0);
-
-		// For DC offset (NOTE: don't use current_sample, which is an absolute value!):
-		offset_sum += input[i];
+		input[channel] = jack_port_get_buffer (input_ports[channel], nframes);
+		for (frame = 0; frame < nframes; frame++)
+		{
+			const float current_sample_abs = fabs(input[channel][frame]);
+	
+			// For peak:
+			if (current_sample_abs > max_sample) { max_sample = current_sample_abs; }
+	
+			// For trough:
+			if (current_sample_abs < min_sample) { min_sample = current_sample_abs; }
+	
+			// For RMS:
+			rms_sum_of_squares += pow(current_sample_abs, 2.0);
+	
+			// For DC offset (NOTE: don't use current_sample, which is an absolute value!):
+			offset_sum += input[channel][frame];
+		}
+	
+		// Copy the resulting values to their respective global variables, from which they can be read from the Tcl side.
+		// (Or maybe just use buffer_peak in the loop above, why not?  Ah, but can't do that trick with the RMS value.)
+		audio_port_stats[channel].buffer_peak = max_sample;
+		audio_port_stats[channel].buffer_trough = min_sample;
+		audio_port_stats[channel].buffer_rms = sqrt(rms_sum_of_squares / nframes);
+		audio_port_stats[channel].buffer_dc_offset = offset_sum / nframes;	// Integer division? Do not want!
 	}
-
-	// Copy the resulting values to their respective global variables, from which they can be read from the Tcl side.
-	// (Or maybe just use buffer_peak in the loop above, why not?  Ah, but can't do that trick with the RMS value.)
-	buffer_peak = max_sample;
-	buffer_trough = min_sample;
-	buffer_rms = sqrt(rms_sum_of_squares / nframes);
-	buffer_dc_offset = offset_sum / nframes;	// Integer division? Do not want!
-
 
 	// And for the MIDI monitor input port:
 	midi_input_buffer = jack_port_get_buffer(midi_input_port, nframes);
