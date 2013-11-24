@@ -41,7 +41,7 @@
 #include <stdbool.h>
 #include <stdlib.h>	// for free()
 #include <jack/jack.h>
-
+#include <jack/midiport.h>
 
 
 // Hmm, we're gonna need some global variables for holding various items of state, huh?
@@ -61,18 +61,14 @@ static bool registered = false;
 // For built-in level metering, we'll need some global variables for storing peak, trough and RMS values for the current buffer.
 // ...and of course the ports themselves!  Naming: input_port, meter_port or monitor_port?
 // TODO: maintain an array of input ports and allow for creating/destroying them dynamically via Tcl commands.
-//jack_port_t *input_port;
-jack_port_t *input_port_left;	// TODO: remove
-jack_port_t *input_port_right;	// TODO: remove
 // Actually, it should probably be an array:
 //int num_audio_meters = 2;	// TODO: make variable and dynamically-allocated n stuff.
 #define num_audio_meters (2)
 jack_port_t *input_ports[num_audio_meters];
 jack_port_t *midi_input_port;
 
-
-// Hmm, should the struct have just the stats, or everything to do with an audio metering port?
-// Note that there is already a jack_port_t which should be used for stuff like the port name.
+// Struct for audio signal level meter statistics.
+// Hmm, should the struct have just the stats, or everything to do with an audio metering port?  Probably just the stats, since there is already a jack_port_t which should be used for stuff like the port name.
 // Do we need to declare these as volatile or something?
 typedef struct audio_port_stats_t {
 	float buffer_peak;
@@ -100,6 +96,7 @@ typedef struct audio_port_stats_t {
 
 // Fixed-size stereo array of these for now (incremental development/stepwise refinement!):
 static audio_port_stats_t audio_port_stats[2];
+
 
 
 // For the MIDI monitor/meter:
@@ -440,7 +437,7 @@ Tcljack_Meter(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *argv[
 		if (Tcl_ListObjAppendElement(interp, stats_list_pointer, Tcl_NewDoubleObj(audio_port_stats[channel_number].buffer_rms))       != TCL_OK) {return TCL_ERROR;}
 		if (Tcl_ListObjAppendElement(interp, stats_list_pointer, Tcl_NewDoubleObj(audio_port_stats[channel_number].buffer_trough))    != TCL_OK) {return TCL_ERROR;}
 		if (Tcl_ListObjAppendElement(interp, stats_list_pointer, Tcl_NewDoubleObj(audio_port_stats[channel_number].buffer_dc_offset)) != TCL_OK) {return TCL_ERROR;}
-		// Finally, assign the sublist to the main result list?!
+		// Finally, assign the sublist to the main result list:
 		if (Tcl_ListObjAppendElement(interp, result_list_pointer, stats_list_pointer) != TCL_OK) {return TCL_ERROR;}
 	}
 
@@ -751,16 +748,19 @@ process_jack_buffer(jack_nframes_t nframes, void *arg)
 	jack_default_audio_sample_t *input[num_audio_meters];	// Array of audio processing buffers
 	jack_default_audio_sample_t *midi_input_buffer;	// One port for MIDI monitoring.
 
-//	jack_default_audio_sample_t *in_right;
+	jack_midi_event_t midi_event_buffer[1];	// Buffer for storing retrieved MIDI event data.  TODO: make dynamic
+
 	unsigned int channel;		// For indexing the input ports/channels.
 	unsigned int frame;		// For for-loop audio buffer index.
+	unsigned int event_num;		// Hmm, or should this be jakc_nframes_t?!  It's not really a number of frames...but perhaps getting the size the same is important.
 
-	// Temporary variables for the analysis pass:
+	// Temporary variables for each analysis pass:
 	jack_default_audio_sample_t max_sample = 0.0;           // For peak (largest encountered) value
 	jack_default_audio_sample_t min_sample = 1.0;           // For trough (smallest non-zero) value
 	jack_default_audio_sample_t rms_sum_of_squares = 0.0;   // For RMS level
 	jack_default_audio_sample_t offset_sum = 0.0;           // for DC offset measurement
 
+	// Perform signal analysis for every metering port:
 	for (channel = 0; channel < num_audio_meters; channel++) {
 		// Reset stats for this channel's buffer:
 		max_sample = 0.0;
@@ -772,20 +772,20 @@ process_jack_buffer(jack_nframes_t nframes, void *arg)
 		for (frame = 0; frame < nframes; frame++)
 		{
 			const float current_sample_abs = fabs(input[channel][frame]);
-	
+
 			// For peak:
 			if (current_sample_abs > max_sample) { max_sample = current_sample_abs; }
-	
+
 			// For trough:
 			if (current_sample_abs < min_sample) { min_sample = current_sample_abs; }
-	
+
 			// For RMS:
 			rms_sum_of_squares += pow(current_sample_abs, 2.0);
-	
+
 			// For DC offset (NOTE: don't use current_sample, which is an absolute value!):
 			offset_sum += input[channel][frame];
 		}
-	
+
 		// Copy the resulting values to their respective global variables, from which they can be read from the Tcl side.
 		// (Or maybe just use buffer_peak in the loop above, why not?  Ah, but can't do that trick with the RMS value.)
 		audio_port_stats[channel].buffer_peak = max_sample;
@@ -794,9 +794,36 @@ process_jack_buffer(jack_nframes_t nframes, void *arg)
 		audio_port_stats[channel].buffer_dc_offset = offset_sum / nframes;	// Integer division? Do not want!
 	}
 
-	// And for the MIDI monitor input port:
+	// And for the MIDI monitor input port (initially we're just looking for activity, so the count of events is all we care about):
 	midi_input_buffer = jack_port_get_buffer(midi_input_port, nframes);
 	midi_event_count += jack_midi_get_event_count(midi_input_buffer);
+
+
+	// Testing reading actual MIDI data:
+/*
+	if (jack_midi_get_event_count(midi_input_buffer) >= 1) {
+		printf("MIDI events: %d\n", jack_midi_get_event_count(midi_input_buffer));
+	}
+*/
+	for (event_num = 0; event_num < jack_midi_get_event_count(midi_input_buffer); event_num++) {
+		jack_midi_event_t midi_event;
+		int returncode;
+
+	//	jack_midi_event_get(midi_event_buffer, midi_input_buffer, 0);
+	//	printf("MIDI data size: %zu\n", midi_event_buffer[0].size);
+
+		returncode = jack_midi_event_get(&midi_event, midi_input_buffer, event_num);	// Retrieve one MIDI event into midi_event
+		if (returncode == 0) {
+			// All's well...
+			size_t j;
+
+			printf("@0x%2x:", midi_event.time);	// I think this is the sample frame position within the current buffer, not the absolute JACK transport time!
+			for(j = 0; j < midi_event.size; ++j) {
+				printf(" %2x", midi_event.buffer[j]);
+			}
+			printf("\n");
+		}
+	}
 
 	return 0;
 }
@@ -863,6 +890,7 @@ Tcljack_Dispatcher(ClientData cdata, Tcl_Interp *interp, int argc,  CONST char *
 int DLLEXPORT
 Tcljack_Init(Tcl_Interp *interp)
 {
+//	printf("TclJACK loading...");
 //	if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL)
 	if (Tcl_InitStubs(interp, "8.4", 0) == NULL)	// Just to make it work on my test system, which has a messy Tcl 8.4 + 8.5 setup.
 	{
@@ -888,6 +916,8 @@ Tcljack_Init(Tcl_Interp *interp)
 
 //	Tcl_CreateCommand(interp, "jack_peak", Tcljack_Peak, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
 	Tcl_CreateCommand(interp, "jack_meter", Tcljack_Meter, (ClientData)NULL, (Tcl_CmdDeleteProc *)NULL);
+
+//	printf("\n");
 
 	return TCL_OK;
 }
