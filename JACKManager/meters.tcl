@@ -42,6 +42,40 @@ proc set_meters_visibility {enabled} {
 }
 
 
+
+proc update_meters {} {
+	# Take a single reading from the current JACK audio buffers and update the meter displays
+	global meter_width meter_height meter_clipping_point
+
+	# How expensive is all this stuff...?
+
+	# Peak level is useful for clipping indicator; RMS for overall level.
+	set meter_readings [jack meter]
+
+	foreach meter_num {0 1} {
+		set meter_reading [lindex $meter_readings $meter_num]
+		set raw_peak_level [lindex $meter_reading 0]
+		set raw_rms_level [lindex $meter_reading 1]
+		set raw_trough_level [lindex $meter_reading 2]
+		set raw_dc_offset [lindex $meter_reading 3]
+	
+		set gauge_colour green	;# Default, everything-is-OK gauge colour.
+		# Cheating to get the meter to appear invisible with silence:
+		if {$raw_peak_level == 0} then {set gauge_colour black}	;# Ha!
+		# For colouring the meter, first check the RMS level and if it's above -14 dB FS (-17 dB numeric), colour the gauge orange or yellow.
+		if {$raw_rms_level > 0.14} then {set gauge_colour yellow}
+		# Or could we base it on peak level?  0.5 or 0.3 threshold?
+	#	if {$raw_peak_level > 0.3} then {set gauge_colour yellow}
+		# Then, check the peak level for clipping, and colour it red if clipping occurred.
+		if {$raw_peak_level > $::meters::meter_clipping_threshold} then {set gauge_colour red}
+	
+		set gauge_value [clip [expr {2.5 * pow($raw_rms_level, 0.67)}] 0 1]
+		.meters.meter${meter_num}.meter configure -height [expr {$gauge_value * ($::meters::meter_height-2)}] -background $gauge_colour
+	}
+}
+
+
+# Old proc, which updated only a single meter one at a time (and would call [jack meter] separately each time, which is probably rather inefficient and would result in the left and right measurements being from different points in time)
 proc update_meter {meter_num} {
 	global meter_width meter_height meter_clipping_point
 
@@ -85,18 +119,20 @@ proc create_meters {} {
 		# Start the meter updating in the background:
 		# TODO: properly figure out how often to update.  Every 16 ms might be reasonable assuming a 60 Hz display refresh rate.  Or, we could try to update when the JACK process() happens...might be more often than necessary?
 		# TODO: have a single "every" to update all the meters!  For both efficiency and to have the meters updated from the same analysis slice (if it's possible to ensure that...?!).  Where to store the meter IDs?
-		set ::meters::updater($meter_num) [every 50 [list update_meter $meter_num]]
+		set ::meters::updater [every 50 update_meters]
+	#	set ::meters::updater($meter_num) [every 50 [list update_meter $meter_num]]	;# Old one-at-a-time approach
 	}
 }
 
 proc destroy_meters {} {
 	destroy .meters
-	foreach meter_num {0 1} {
-		every cancel $::meters::updater($meter_num)
-	}
+	every cancel $::meters::updater
+#	foreach meter_num {0 1} {
+#		every cancel $::meters::updater($meter_num)
+#	}
 }
 
-proc show_meters {} {grid .meters -row 0 -column 5}
+proc show_meters {} {grid .meters -row 0 -column 6}
 
 proc hide_meters {} {grid forget .meters}
 

@@ -63,13 +63,14 @@ jack register
 # Hmm, should probably define in one place what the external and internal names for the various components should be:
 # TODO: make the ordering here and the grid -column specifiers in the individual component files less fragile.  Perhaps a third "attribute" for which column of the grid the component should be in?  Do we want to allow them to be rearranged?
 set panel_components {
-	{"Main Menu Button"   menubutton}
-	{"Transport Controls" transport}
-	{"Timecode Display"   timecode}
-	{"Sampling Rate"      samplerate}
-	{"CPU DSP Load"       cpuload}
-	{"Audio Meters"       meters}
-	{"MIDI Activity Indicator"	midi_activity_indicator}
+	{"Main Menu Button"         menubutton               0}
+	{"Transport Controls"       transport                1}
+	{"Timecode Display"         timecode                 2}
+	{"Sampling Rate"            samplerate               3}
+	{"Matrix Patcher"           patcher                  4}
+	{"CPU DSP Load"             cpuload                  5}
+	{"Audio Meters"             meters                   6}
+	{"MIDI Activity Indicator"  midi_activity_indicator  7}
 }
 # Maybe put the audio meters after the timecode?  It's more important than Fs and CPU meters.
 
@@ -82,6 +83,7 @@ set transport_component_enabled 1
 set timecode_component_enabled 1
 set cpuload_component_enabled 1
 set samplerate_component_enabled 1
+set patcher_component_enabled 1
 set meters_component_enabled 1
 set midi_activity_indicator_component_enabled 1
 

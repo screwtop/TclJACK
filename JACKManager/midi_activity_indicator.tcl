@@ -70,7 +70,7 @@ proc create_midi_activity_indicator {} {
 proc destroy_midi_activity_indicator {} {destroy .midi_activity_indicator; every cancel $::midi_activity_indicator::updater}
 
 # TODO: uh, hard-coded column index?! Fix.
-proc show_midi_activity_indicator {} {grid .midi_activity_indicator -row 0 -column 6}
+proc show_midi_activity_indicator {} {grid .midi_activity_indicator -row 0 -column 7}
 
 proc hide_midi_activity_indicator {} {grid forget .midi_activity_indicator}
 

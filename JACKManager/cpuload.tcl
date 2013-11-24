@@ -20,7 +20,7 @@ proc create_cpuload {} {
 
 proc destroy_cpuload {} {destroy .cpuload}
 
-proc show_cpuload {} {grid .cpuload -row 0 -column 4}
+proc show_cpuload {} {grid .cpuload -row 0 -column 5}
 
 proc hide_cpuload {} {grid forget .cpuload}
 
