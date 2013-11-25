@@ -2,6 +2,13 @@
 
 	.application_menu add separator
 	.application_menu add cascade -menu [menu .application_menu.debugging_menu] -label {Debugging}
+		.application_menu.debugging_menu add command -label {JACK port list} -command {
+			foreach port [jack ports] {
+				puts $port
+				puts "\t[jack portflags $port]"
+				puts "\t[jack porttype $port]"
+			}
+		}
 		# TODO: make disconnecting halt the display updates (which will fail if not connected, of course).
 		.application_menu.debugging_menu add command -label {JACK Disconnect} -command {jack deregister}
 		.application_menu.debugging_menu add command -label {JACK Reconnect} -command {jack register}

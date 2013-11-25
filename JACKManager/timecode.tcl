@@ -36,7 +36,7 @@ proc create_timecode {} {
 	# What update interval to use?  Many displays run at 60 Hz, so ~16 ms would match the refresh period.
 	# The timecode strings are currently formatted to (somewhat arbitrarily) millisecond precision.  At 96 kHz, a frame is only about 10 microseconds.
 	# TODO: pause refreshing if we disconnect from JACK!
-	every 50 {
+	every 16 {
 		set time_in_frames [jack timecode]
 		set ::jack_timecode_string [frames_to_hhmmss $time_in_frames [jack samplerate]]
 		.timecode.menu entryconfigure 1 -label $::jack_timecode_string
