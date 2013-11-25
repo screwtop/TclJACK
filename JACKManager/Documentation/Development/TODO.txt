@@ -1,6 +1,11 @@
 JACKManager To-Do List:
 (Oh, do I have one of these already in the top-level TclJACK docs folder?)
 
+[ ] Figure out why having the timecode tear-off menu open causes the tooltips on the patchbay window not to display.
+
+[ ] Have the timecode display pause when disconnected (deregistered) from JACK.
+
+[ ] Fix problem with error when trying to open the About window when it's already open.
 
 [ ] Figure out how to get Ion's systray layout to refresh when adding (and I guess removing) components.
 
@@ -29,3 +34,4 @@ JACKManager To-Do List:
 [ ] Fix jackmanager.tcl segfault when fed very loud audio!  Probably a libtcljack problem.  It wasn't the meter drawing (I clipped it to 0..1).
 
 [ ] A warning when approaching JACK's transport frame wraparound point.
+
