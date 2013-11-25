@@ -24,8 +24,10 @@ set auto_path [lappend auto_path /usr/local/lib/tcl8.5/tcljack]
 
 #wm withdraw .	;# Hide the window initially, until everything is set up
 
+source version.tcl
+
 set application_name {JACKManager}
-set about_text "JACKManager, a Tcl/Tk-based control panel for the JACK Audio Connection Kit\n©2009, 2010 Chris Edwards"
+set about_text "JACKManager, a Tcl/Tk-based control panel for the JACK Audio Connection Kit\n©$::copyright_date_text $::author_text\n$::project_url"
 
 wm title . $application_name
 
@@ -45,7 +47,6 @@ source anticlip.tcl	;# Used in transport.tcl
 source tooltips.tcl	;# Tooltips/balloon-help implementation.
 
 # JACKManager components split into separate files:
-source version.tcl
 #source settings_jack.tcl	;# Not ready yet.
 source about.tcl
 
