@@ -117,6 +117,7 @@ menu .jack.menu.sink_ports
 # Various procedures to gather JACK state data through the jack_* commands.
 
 # Get a list of JACK ports.  All ports, or have separate procs for playback and capture ports?  Might be nice to only call jack_lsp once and gather as much information as possible, for efficiency (assuming starting new process is more expensive than piping and processing a little more text).
+# TODO: decommission this, as it should be provided by the TclJACK C library.  Ditto for jack_connect and jack_disconnect.
 proc get_jack_port_list {} {
 	# Run the jack_lsp command to get port information...
 	# Might as well use expect for this, I think.

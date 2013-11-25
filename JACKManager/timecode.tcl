@@ -26,14 +26,22 @@ proc create_timecode {} {
 
 	# Set up its context menu:
 	menu .timecode.menu
-		.timecode.menu add command -label {00:00:00.000}
-		.timecode.menu add command -label {Bars and Beats}
+		.timecode.menu add command -label {00:00:00.000}	;# entry #1 (0 is the menu tear-off tab)
+		.timecode.menu add command -label {[TODO: Bars:Beats]}
 		.timecode.menu add command -label {Frames (Samples)}
-		.timecode.menu add command -label {SMPTE}
+		.timecode.menu add command -label {[TODO: SMPTE]}
 	#	.timecode.menu add separator
 
 	# Lastly, start its updates running:
-	every 16 {set ::jack_timecode_string [frames_to_hhmmss [jack timecode] [jack samplerate]]}	;# "hhh:mm:ss.mss"
+	# What update interval to use?  Many displays run at 60 Hz, so ~16 ms would match the refresh period.
+	# The timecode strings are currently formatted to (somewhat arbitrarily) millisecond precision.  At 96 kHz, a frame is only about 10 microseconds.
+	# TODO: pause refreshing if we disconnect from JACK!
+	every 50 {
+		set time_in_frames [jack timecode]
+		set ::jack_timecode_string [frames_to_hhmmss $time_in_frames [jack samplerate]]
+		.timecode.menu entryconfigure 1 -label $::jack_timecode_string
+		.timecode.menu entryconfigure 3 -label $time_in_frames
+	}	;# "hhh:mm:ss.mss"
 #	every 50 {set ::jack_timecode_string [jack timecode]}	;# For raw frames
 }
 
