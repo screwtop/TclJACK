@@ -1,10 +1,16 @@
 # Variables you might need to change:
+# To make/install for a specific Tcl version (if you have several installed), pass TCL_VERSION like so:
+# make TCL_VERSION=8.6
 
+TCL_VERSION=$(shell echo "puts [info tclversion]" | /usr/bin/env tclsh)
+#TCL_VERSION=8.6
 CC=gcc
-TCLSH=tclsh8.5
-TCLINC=/usr/include/tcl8.5
-TCLLIB=/usr/lib -ltclstub8.5
-INSTALL_PATH=/usr/local/lib/tcl8.5/tcljack
+TCLSH=tclsh$(TCL_VERSION)
+# Not sure how to reliably determine this:
+TCLINC=/usr/include/tcl$(TCL_VERSION)
+TCLLIB=/usr/lib -ltclstub$(TCL_VERSION)
+TCL_LIB_PATH=$(shell echo "puts [info library]" | /usr/bin/env tclsh$(TCL_VERSION))
+INSTALL_PATH=$(TCL_LIB_PATH)/tcljack
 CFLAGS=-fPIC -shared -DUSE_TCL_STUBS
 
 
